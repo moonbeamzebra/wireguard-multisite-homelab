@@ -1,0 +1,16 @@
+# Secrets -- never commit
+secrets-*.env
+
+# HowTo en construction
+*.ht.txt
+
+# Generated ISOs
+*.iso
+debian-12-preseed-*.iso
+
+# macOS noise
+.DS_Store
+._*
+
+# Temporary preseed build dirs
+/tmp/debian-preseed-build-*/

@@ -1,0 +1,175 @@
+# preseed.cfg.tmpl -- Debian 12 automated install template
+# Placeholders (%%VAR%%) are replaced by 02-create-server00.sh via sed.
+#
+# Variables substituted:
+#   %%PRESEED_HOSTNAME%%   -- e.g. home / cottage
+#   %%PRESEED_DOMAIN%%     -- e.g. home.lab / cottage.lab
+#   %%IF_LAN%%             -- primary LAN interface, e.g. ens33
+#   %%PRESEED_IP%%         -- static IP for that interface (no prefix), e.g. 10.0.10.2
+#   %%PRESEED_NETMASK%%    -- e.g. 255.255.255.0
+#   %%PRESEED_GW%%         -- e.g. 10.0.10.1
+#   %%LAB_SSH_PUBKEY%%     -- ed25519 public key for lab user
+#   %%LAB_PASSWORD%%       -- lab user password (console fallback)
+#   %%ROOT_PASSWORD%%      -- root password (console fallback)
+#
+# Philosophy: minimum viable install only.
+# Everything else is handled by 03-packages.sh and subsequent scripts.
+
+# -- Locale + keyboard ---------------------------------------------------------
+d-i debian-installer/locale string en_US.UTF-8
+d-i keyboard-configuration/xkb-keymap select us
+
+# -- Network -- static IP on primary LAN interface ------------------------------
+# Avoids needing a DHCP server (router00 isn't deployed yet at this stage).
+d-i netcfg/choose_interface select %%IF_LAN%%
+d-i netcfg/disable_autoconfig boolean true
+d-i netcfg/get_ipaddress string %%PRESEED_IP%%
+d-i netcfg/get_netmask string %%PRESEED_NETMASK%%
+d-i netcfg/get_gateway string %%PRESEED_GW%%
+d-i netcfg/get_nameservers string 8.8.8.8
+d-i netcfg/confirm_static boolean true
+d-i netcfg/get_hostname string %%PRESEED_HOSTNAME%%
+d-i netcfg/get_domain string %%PRESEED_DOMAIN%%
+d-i netcfg/wireless_wep string
+
+# -- Mirror --------------------------------------------------------------------
+d-i mirror/country string CA
+d-i mirror/http/hostname string ftp.ca.debian.org
+d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string
+
+# -- Clock ---------------------------------------------------------------------
+d-i clock-setup/utc boolean true
+d-i time/zone string America/Montreal
+d-i clock-setup/ntp boolean true
+
+# -- LVM partitioning ----------------------------------------------------------
+#
+#  /dev/sda
+#  sda1    512M   EFI   (vfat)
+#  sda2      1G   /boot (ext4, outside LVM)
+#  sda3    ~98G   PV LVM -> VG vg0
+#
+#  VG vg0  (~98G total)
+#  lv-root    10G   /
+#  lv-var      8G   /var
+#  lv-tmp      2G   /tmp
+#  lv-kvm     20G   /var/lib/libvirt/images
+#  ~58G unallocated -- ready to extend
+#
+d-i partman-auto/disk string /dev/sda
+d-i partman-auto/method string lvm
+d-i partman-auto/purge_lvm_from_device boolean true
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+
+d-i partman-auto/choose_recipe select custom-lvm
+d-i partman-auto/expert_recipe string        \
+  custom-lvm ::                              \
+    512 512 512 fat32                        \
+      $primary{ }                            \
+      method{ efi }                          \
+      format{ }                              \
+    .                                        \
+    1024 1024 1024 ext4                      \
+      $primary{ }                            \
+      $bootable{ }                           \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ /boot }                    \
+    .                                        \
+    100 1000 -1 ext4                         \
+      $primary{ }                            \
+      method{ lvm }                          \
+      device{ /dev/sda }                     \
+      vg_name{ vg0 }                         \
+    .                                        \
+    10240 10240 10240 ext4                   \
+      $lvmok{ }                              \
+      in_vg{ vg0 }                           \
+      lv_name{ lv-root }                     \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ / }                        \
+    .                                        \
+    8192 8192 8192 ext4                      \
+      $lvmok{ }                              \
+      in_vg{ vg0 }                           \
+      lv_name{ lv-var }                      \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ /var }                     \
+    .                                        \
+    2048 2048 2048 ext4                      \
+      $lvmok{ }                              \
+      in_vg{ vg0 }                           \
+      lv_name{ lv-tmp }                      \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ /tmp }                     \
+    .                                        \
+    20480 20480 20480 ext4                   \
+      $lvmok{ }                              \
+      in_vg{ vg0 }                           \
+      lv_name{ lv-kvm }                      \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ /var/lib/libvirt/images }  \
+    .
+
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+
+# Suppress "no swap partition" warning -- swap is created in late_command as a swapfile
+d-i partman-basicfilesystems/no_swap boolean false
+
+# -- Users ---------------------------------------------------------------------
+d-i passwd/root-login boolean true
+d-i passwd/root-password password %%ROOT_PASSWORD%%
+d-i passwd/root-password-again password %%ROOT_PASSWORD%%
+
+d-i passwd/make-user boolean true
+d-i passwd/user-fullname string lab
+d-i passwd/username string lab
+d-i passwd/user-password password %%LAB_PASSWORD%%
+d-i passwd/user-password-again password %%LAB_PASSWORD%%
+d-i passwd/user-groups string sudo
+
+# -- Packages -- strict minimum -------------------------------------------------
+tasksel tasksel/first multiselect
+d-i pkgsel/include string openssh-server sudo curl
+d-i pkgsel/upgrade select full-upgrade
+d-i pkgsel/update-policy select none
+popularity-contest popularity-contest/participate boolean false
+
+# -- GRUB ----------------------------------------------------------------------
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/bootdev string /dev/sda
+
+# -- Post-install --------------------------------------------------------------
+d-i preseed/late_command string \
+    in-target bash -c 'echo "lab ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/lab && chmod 440 /etc/sudoers.d/lab'; \
+    in-target bash -c 'mkdir -p /home/lab/.ssh && chmod 700 /home/lab/.ssh'; \
+    in-target bash -c 'echo "%%LAB_SSH_PUBKEY%%" > /home/lab/.ssh/authorized_keys'; \
+    in-target bash -c 'chmod 600 /home/lab/.ssh/authorized_keys && chown -R lab:lab /home/lab/.ssh'; \
+    in-target bash -c 'fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile'; \
+    in-target bash -c 'echo /swapfile none swap sw 0 0 >> /etc/fstab'; \
+    in-target bash -c 'echo "export LIBVIRT_DEFAULT_URI=qemu:///system" >> /home/lab/.bashrc'; \
+    in-target bash -c 'echo "kvm_intel" > /etc/modules-load.d/kvm.conf'
+
+# -- Reboot --------------------------------------------------------------------
+d-i finish-install/reboot_in_progress note
