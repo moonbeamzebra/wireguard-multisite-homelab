@@ -101,6 +101,9 @@ network:
     ${IF_MGMT_ACCESS}:
       dhcp4: no
       optional: true
+    ${IF_ISP_REAL}:
+      dhcp4: no
+      optional: true
 
   bridges:
     br-ext:
@@ -119,6 +122,13 @@ network:
 
     br-isp:
       interfaces: [${IF_ISP}]
+      dhcp4: no
+      parameters:
+        stp: false
+        forward-delay: 0
+
+    br-isp-real:
+      interfaces: [${IF_ISP_REAL}]
       dhcp4: no
       parameters:
         stp: false
