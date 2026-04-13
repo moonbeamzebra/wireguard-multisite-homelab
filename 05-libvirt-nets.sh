@@ -45,6 +45,15 @@ cat > /tmp/libvirt-nets/lan-isp.xml << EOF
 </network>
 EOF
 
+cat > /tmp/libvirt-nets/lan-isp-real.xml << EOF
+<network>
+  <${NN}>lan-isp-real</${NN}>
+  <forward mode="bridge"/>
+  <bridge ${NN}="br-isp-real"/>
+  <portgroup ${NN}="lanips" default="yes"/>
+</network>
+EOF
+
 cat > /tmp/libvirt-nets/lan-dmz.xml << EOF
 <network>
   <${NN}>lan-dmz</${NN}>
@@ -89,6 +98,7 @@ cat > /tmp/libvirt-nets/lan-mgmt-access.xml << EOF
 EOF
 
 define_network "lan-isp"    /tmp/libvirt-nets/lan-isp.xml
+define_network "lan-isp-real"    /tmp/libvirt-nets/lan-isp-real.xml
 define_network "lan-dmz"    /tmp/libvirt-nets/lan-dmz.xml
 define_network "lan-ext"    /tmp/libvirt-nets/lan-ext.xml
 define_network "lan-int"    /tmp/libvirt-nets/lan-int.xml
