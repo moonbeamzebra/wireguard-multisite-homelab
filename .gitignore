@@ -1,5 +1,6 @@
 # Secrets -- never commit
 secrets-*.env
+secrets-*.conf
 
 # HowTo en construction
 *.ht.txt
