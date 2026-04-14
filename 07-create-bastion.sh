@@ -176,6 +176,16 @@ write_files:
   # Connections initiated from internet: DROP
   - path: /etc/iptables/rules-save
     content: |
+      *mangle
+      :PREROUTING ACCEPT [0:0]
+      :INPUT ACCEPT [0:0]
+      :FORWARD ACCEPT [0:0]
+      :OUTPUT ACCEPT [0:0]
+      :POSTROUTING ACCEPT [0:0]
+      # Clamp TCP MSS to Path MTU for all forwarded traffic (WireGuard optimization)
+      -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+      COMMIT
+
       *nat
       :PREROUTING ACCEPT [0:0]
       :INPUT ACCEPT [0:0]
@@ -266,7 +276,7 @@ virt-install \
     --os-variant alpinelinux3.17 \
     --disk path=/var/lib/libvirt/images/${BASTION_VM_NAME}.qcow2,format=qcow2 \
     --disk path=/var/lib/libvirt/images/${BASTION_VM_NAME}-cidata.iso,device=cdrom \
-    --network network=lan-isp,mac=${MAC_eth0} \
+    --network network=${NET_Bastion_eth0},mac=${MAC_eth0} \
     --network network=lan-dmz,mac=${MAC_eth1} \
     --graphics none \
     --import \
