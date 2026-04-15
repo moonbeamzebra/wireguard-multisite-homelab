@@ -12,7 +12,14 @@ mkdir -p /root/lab /etc/wireguard /etc/local.d
 ##############
 ## PACKAGES ##
 ##############
-apk add wireguard-tools iproute2 dnsmasq iptables tcpdump htop
+# Allow sudo to install: activate community repo
+sed -i 's/#\(.*\/community\)/\1/' /etc/apk/repositories
+apk update
+apk add wireguard-tools iproute2 dnsmasq iptables tcpdump htop sudo
+# Disable community repo
+sed -i 's/\(.*\/community\)/#\1/' /etc/apk/repositories
+# Clean apk cache
+rm -rf /var/cache/apk/*
 
 ################################
 ## /etc/local.d/network.start ##
@@ -70,14 +77,6 @@ ip netns exec router00 ip route add default via ${ROUTER00_GW_eth0}
 # Scope link route to ensure DMZ is reachable locally
 ip netns exec router00 ip route add 10.1.1.0/30 dev v-router00 scope link
 
-# Local link (veth)
-ip link add fmp-d type veth peer name fmp-u
-ip link set fmp-u netns router00
-ip addr add 169.254.0.1/16 dev fmp-d
-ip link set fmp-d up
-ip netns exec router00 ip addr add 169.254.0.2/16 dev fmp-u
-ip netns exec router00 ip link set fmp-u up
-
 # --- 6. VPN & FORWARDING (Manual WG Setup) ---
 # Enable IP Forwarding
 ip netns exec bastion sysctl -w net.ipv4.ip_forward=1
@@ -97,10 +96,6 @@ ip netns exec bastion ip route add 10.1.0.0/16 via ${ROUTER00_IP_eth0}
 # DNS Server in Router00
 ip netns exec router00 dnsmasq --conf-file=/etc/dnsmasq-cottage.conf
 
-# SSH Instances for Management (Double-SSH Pattern)
-mkdir -p /var/run/sshd
-ip netns exec router00 /usr/sbin/sshd -o "ListenAddress=${ROUTER00_IP_eth1}"
-ip netns exec bastion /usr/sbin/sshd -o "ListenAddress=${BASTION_IP_eth1}"
 
 # --- 8. IPTABLES - BASTION ---
 ip netns exec bastion iptables -F
@@ -143,10 +138,123 @@ ip netns exec router00 iptables -A INPUT -i v-router00 -j ACCEPT
 ip netns exec router00 iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
 ip netns exec router00 iptables -A FORWARD -i ${IF_LAN} -o v-router00 -j ACCEPT
 ip netns exec router00 iptables -A FORWARD -i v-router00 -o ${IF_LAN} -j ACCEPT
+
+# Disable Alpine's native SSH
+# SSH access is control via /root/lab/mgmt-access.sh
+# See below
+rc-update del sshd default
+
+# --- Management Access ---
+# Comment the line below to lock down the Pi (Console access only)
+/root/lab/mgmt-access.sh
+
 EOF
 
 chmod +x /etc/local.d/network.start
 rc-update add local default
+
+##############################
+## /root/lab/mgmt-access.sh ##
+##############################
+cat > /root/lab/mgmt-access.sh << 'EOF'
+#!/bin/ash
+
+# --- 0. Prerequisites & Sudo Setup ---
+# Load environment variables for SSH keys
+if [ -f /root/lab/secrets-B-pi4.env ]; then
+    source /root/lab/secrets-B-pi4.env
+fi
+
+# Generate SSH Host Keys if they don't exist (required for sshd to start)
+ssh-keygen -A
+
+# Configure sudo for 'lab' user (no password required)
+echo "lab ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/lab
+chmod 0440 /etc/sudoers.d/lab
+
+# Setup authorized_keys for 'lab' user
+if [ -n "$LAB_SSH_PUBKEY" ]; then
+    mkdir -p /home/lab/.ssh
+    echo "$LAB_SSH_PUBKEY" > /home/lab/.ssh/authorized_keys
+    chown -R lab:lab /home/lab/.ssh
+    chmod 700 /home/lab/.ssh
+    chmod 600 /home/lab/.ssh/authorized_keys
+fi
+
+# --- 1. SSH Configuration Files ---
+mkdir -p /etc/ssh/config_custom
+mkdir -p /var/run/sshd
+
+# Create the ProxyJump warning banner
+echo "-----------------------" > /etc/ssh/config_custom/sshd_banner_proxy
+echo "   PROXY JUMP ONLY     " >> /etc/ssh/config_custom/sshd_banner_proxy
+echo "-----------------------" >> /etc/ssh/config_custom/sshd_banner_proxy
+
+# Entry point SSHD (in router00 namespace) - Strictly for ProxyJump
+cat > /etc/ssh/config_custom/sshd_config_entry << 'ENTRY'
+ListenAddress 10.1.10.1
+Port 22
+Protocol 2
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Lockdown: No shell, no TTY, only TCP forwarding
+Banner /etc/ssh/config_custom/sshd_banner_proxy
+MaxSessions 0
+PermitTTY no
+ForceCommand /bin/false
+AllowTcpForwarding yes
+X11Forwarding no
+AllowAgentForwarding no
+ENTRY
+
+# Destination SSHD (on the Host) - Shell access allowed here
+cat > /etc/ssh/config_custom/sshd_config_host << 'HOST'
+ListenAddress 169.254.0.1
+Port 22
+Protocol 2
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Allow 'lab' user to log in via key
+PermitRootLogin yes
+PasswordAuthentication yes
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+HOST
+
+# --- 2. Emergency Host Access (VETH Pair) ---
+ip link add fmp-d type veth peer name fmp-u 2>/dev/null
+ip link set fmp-u netns router00 2>/dev/null
+ip addr add 169.254.0.1/16 dev fmp-d 2>/dev/null
+ip link set fmp-d up
+ip netns exec router00 ip addr add 169.254.0.2/16 dev fmp-u 2>/dev/null
+ip netns exec router00 ip link set fmp-u up
+
+# --- 3. Start SSH Services ---
+pkill -f sshd_config_entry
+pkill -f sshd_config_host
+
+ip netns exec router00 /usr/sbin/sshd -f /etc/ssh/config_custom/sshd_config_entry
+/usr/sbin/sshd -f /etc/ssh/config_custom/sshd_config_host
+
+# --- 4. User Profiles & Aliases ---
+cat > /root/.profile << 'ROOT_PROF'
+export PS1='\h$(N=$(ip netns identify); [ -n "$N" ] && echo "-[\[\e[1;32m\]ns-$N\[\e[0m\]]"):\w\$ '
+alias bastion='ip netns exec bastion /bin/ash'
+alias router='ip netns exec router00 /bin/ash'
+ROOT_PROF
+
+cat > /home/lab/.profile << 'LAB_PROF'
+export PS1='\u@\h$(N=$(ip netns identify); [ -n "$N" ] && echo "-[\[\e[1;32m\]ns-$N\[\e[0m\]]"):\w\$ '
+alias bastion='sudo ip netns exec bastion /bin/ash'
+alias router='sudo ip netns exec router00 /bin/ash'
+LAB_PROF
+chown lab:lab /home/lab/.profile
+
+EOF
+chmod +x /root/lab/mgmt-access.sh
+chmod 700 /root/lab/mgmt-access.sh
 
 ###############################
 ## /etc/dnsmasq-cottage.conf ##
@@ -188,6 +296,7 @@ host-record=c-router00.cottage.lab,10.1.10.1
 # --- Reverse DNS Forwarding ---
 server=/0.10.in-addr.arpa/10.0.10.1
 EOF
+
 
 cat > /root/lab/site-B-pi4.env << 'EOF'
 # -- Identity ------------------------------------------------------------------
@@ -288,6 +397,7 @@ EOF
 cat > /root/lab/interfaces << 'EOF'
 ################################
 ## rm /etc/local.d/network.start
+## sudo rc-update add sshd default
 ## cp /root/lab/interfaces /etc/network/interfaces
 ## reboot
 ################################
