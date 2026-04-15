@@ -209,8 +209,8 @@ AllowAgentForwarding no
 ENTRY
 
 # Destination SSHD (on the Host) - Shell access allowed here
-cat > /etc/ssh/config_custom/sshd_config_host << 'HOST'
-ListenAddress 169.254.0.1
+cat > /etc/ssh/config_custom/sshd_config_host << HOST
+ListenAddress ${ROUTER00_DEFAULT_NS_FMP_D_IP}
 Port 22
 Protocol 2
 HostKey /etc/ssh/ssh_host_rsa_key
@@ -226,9 +226,9 @@ HOST
 # --- 2. Emergency Host Access (VETH Pair) ---
 ip link add fmp-d type veth peer name fmp-u 2>/dev/null
 ip link set fmp-u netns router00 2>/dev/null
-ip addr add 169.254.0.1/16 dev fmp-d 2>/dev/null
+ip addr add ${ROUTER00_DEFAULT_NS_FMP_D_IP}/${ROUTER00_NS_FMP_MASK} dev fmp-d 2>/dev/null
 ip link set fmp-d up
-ip netns exec router00 ip addr add 169.254.0.2/16 dev fmp-u 2>/dev/null
+ip netns exec router00 ip addr add ${ROUTER00_ROUTER_NS_FMP_U_IP}/${ROUTER00_NS_FMP_MASK} dev fmp-u 2>/dev/null
 ip netns exec router00 ip link set fmp-u up
 
 # --- 3. Start SSH Services ---
@@ -370,7 +370,7 @@ chmod 600 /etc/wireguard/wg0-core.conf
 #################################
 ## /root/lab/secrets-B-pi4.env ##
 #################################
-# secrets-B-pi4.env has secret info - copy-paste secrets-B-pi4.env (from secrets-B.env.template)
+# secrets-B-pi4.env has secret info - copy-paste secrets-B-pi4.env (from secrets-B-pi4.env.template)
 # No environment variables in it ; variables must be already resolved (values)
 vi /root/lab/secrets-B-pi4.env
 chmod 600 /root/lab/secrets-B-pi4.env
