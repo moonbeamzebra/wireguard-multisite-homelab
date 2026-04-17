@@ -2,8 +2,13 @@
 secrets-*.env
 secrets-*.conf
 
+# Original kept
+*.orginal.sh
+
 # HowTo en construction
 *.ht.txt
+
+*.tar.gz
 
 # Generated ISOs
 *.iso

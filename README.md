@@ -1,261 +1,134 @@
 # WireGuard Lab -- Infrastructure as Code
 
-Multi-site home lab running on VMware Fusion (Mac Intel) with two sites
-connected by a WireGuard VPN tunnel. Simulates a real dual-site infrastructure
-(primary residence + secondary residence) with full inter-site routing,
-VLAN segmentation, and DNS.
+Multi-site home lab with a WireGuard VPN tunnel connecting two real sites:
+a primary residence (site A, "home") and a secondary residence (site B, "cottage").
 
-## Architecture
+Site A runs on a Debian 12 / KVM / OVS stack inside VMware Fusion on a Mac Intel.
+Site B runs on a Raspberry Pi 4 with Alpine Linux.
+
+---
+
+## Architecture overview
 
 ```
-Mac Intel (VMware Fusion host)
-|
-|-- jmp00 (Alpine VMware VM -- permanent bootstrap infrastructure)
-|   eth0: Bridged WiFi  192.168.86.231   -> internet via Mac Wi-Fi
-|   eth1: vmnet6        10.0.10.254      -> site home LAN
-|   eth2: vmnet7        10.1.10.254      -> site cottage LAN
-|   roles:
-|     - Bootstrap internet gateway during host rebuild (before router00 exists)
-|     - SSH ProxyJump entry point from Mac into both sites
-|     - dnsmasq: resolves home.lab -> site A router00, cottage.lab -> site B
-|     - iptables DROP eth1<->eth2: inter-site traffic forced via WireGuard
-|
-|-- Site home VM (Debian 12 / KVM / OVS)   hostname: h-server00
-|   br-ext:        10.0.10.2/24   (vmnet6  -- LAN)
-|   br-isp:        no IP          (vmnet3  -- passthrough to h-bastion eth0)
-|   br-mgmt-access: no IP         (bridged -- Mac management access)
-|   br-dmz:        no IP          (virtual segment h-bastion <-> h-router00)
-|   ovs-lab:       no IP          (OVS trunk -- VLANs 20, 30)
-|   |
-|   |-- h-bastion (Alpine + WireGuard)
-|   |   eth0 WAN: 192.168.0.10     -> h-ce -> internet
-|   |   eth1 DMZ: 10.0.1.1/30
-|   |   wg0:      10.0.0.1/30     <---- WireGuard tunnel ---->
-|   |
-|   |-- h-router00 (Alpine -- DHCP/DNS/inter-VLAN routing)
-|   |   eth0 DMZ:   10.0.1.2/30
-|   |   eth1 LAN10: 10.0.10.1
-|   |   VLAN20:     10.0.20.1
-|   |   VLAN30:     10.0.30.1
-|   |
-|   \-- h-demo-lan10/20/30 (Alpine -- test VMs)
-|
-\-- Site cottage VM (Debian 12 / KVM / OVS)   hostname: c-server00
-    br-ext:        10.1.10.2/24   (vmnet7  -- LAN)
-    br-isp:        no IP          (vmnet10 -- passthrough to c-bastion eth0)
-    br-mgmt-access: no IP         (bridged -- Mac management access)
-    br-dmz:        no IP          (virtual segment c-bastion <-> c-router00)
-    ovs-lab:       no IP          (OVS trunk -- VLANs 20, 30)
+Internet (real public IP)
+     |
+     |-- Port forward UDP XXXX1 --> Mac Intel NIC --> h-bastion WAN
+     |-- Port forward UDP XXXX2 --> Pi 4 eth1    --> c-bastion WAN
+     |
+     +===========================  WireGuard tunnel  ===========================+
+     |                                                                          |
+     |  Site A -- home                          Site B -- cottage               |
+     |  Mac Intel (VMware Fusion)               Raspberry Pi 4 (Alpine)         |
+     |                                                                          |
+     |  h-server00 (Debian 12 / KVM)            (no KVM -- single Pi 4)         |
+     |    |                                       |                             |
+     |    +-- h-bastion (Alpine KVM)              +-- bastion namespace          |
+     |    |   WAN: 192.168.0.250                      WAN (eth1 USB): varies    |
+     |    |   DMZ: 10.0.1.1/30                        DMZ (veth): 10.1.1.1/30   |
+     |    |   wg0: 10.0.0.1/30 <----tunnel----->      wg0: 10.0.0.2/30          |
+     |    |                                                                      |
+     |    +-- h-router00 (Alpine KVM)            +-- router00 namespace          |
+     |    |   DMZ:   10.0.1.2/30                     DMZ (veth): 10.1.1.2/30    |
+     |    |   LAN10: 10.0.10.1                        LAN (eth0 RJ45): 10.1.10.1 |
+     |    |   VLAN20: 10.0.20.1                                                  |
+     |    |   VLAN30: 10.0.30.1                                                  |
+     |    |                                                                      |
+     |    +-- h-demo-lan10/20/30 (Alpine KVMs)                                  |
+     |                                                                          |
+     +=========================================================================+
+```
+
+### Site B network namespaces on the Pi 4
+
+The Pi 4 runs both bastion and router00 as Linux network namespaces rather than
+separate VMs. A veth pair (v-bastion / v-router00) acts as the DMZ link between
+the two namespaces. The physical interfaces are moved into their respective
+namespaces at boot -- the default namespace holds no production IP.
+
+```
+Pi 4 (Alpine)
+  default ns
+    |-- fmp-d (management veth, for host SSHD only)
     |
-    |-- c-bastion (Alpine + WireGuard)
-    |   eth0 WAN: 192.168.1.10     -> c-ce -> internet
-    |   eth1 DMZ: 10.1.1.1/30
-    |   wg0:      10.0.0.2/30     <---- WireGuard tunnel ---->
+    +-- bastion ns
+    |     eth1 (USB dongle)  --> ISP modem / WAN
+    |     v-bastion          --> veth DMZ link
+    |     wg0                --> WireGuard tunnel to site A
     |
-    |-- c-router00 (Alpine -- DHCP/DNS/inter-VLAN routing)
-    |   eth0 DMZ:   10.1.1.2/30
-    |   eth1 LAN10: 10.1.10.1
-    |   VLAN20:     10.1.20.1
-    |   VLAN30:     10.1.30.1
-    |
-    \-- c-demo-lan10/20/30 (Alpine -- test VMs)
+    +-- router00 ns
+          eth0 (integrated)  --> home network LAN / Google Nest
+          v-router00         --> veth DMZ link
+          dnsmasq            --> DHCP + DNS for site B
 ```
 
 ---
 
-## VMware Fusion network configuration (Mac Intel)
-
-These vmnet assignments are fixed in VMware Fusion preferences.
-No DHCP, no NAT on any of these -- all static, all controlled by the lab:
-
-```
-vmnet3   192.168.0.0/24   site home ISP-side LAN   (h-ce LAN, h-bastion eth0)
-vmnet6   10.0.10.0/24     site home internal LAN    (h-server00 br-ext, jmp00 eth1)
-vmnet7   10.1.10.0/24     site cottage internal LAN (c-server00 br-ext, jmp00 eth2)
-vmnet8   192.168.16.0/24  VMware NAT (Mac internet) (h-ce WAN, c-ce WAN)
-vmnet10  192.168.1.0/24   site cottage ISP-side LAN (c-ce LAN, c-bastion eth0)
-vmnet11  --               Bridged Wi-Fi (physical)  (jmp00 eth0, h-server00 br-mgmt-access)
-```
-
-Physical Wi-Fi (vmnet11 / bridged) is used by jmp00 for internet access and
-by the server VMs for management access from the Mac. It has no fixed subnet
-assignment -- it inherits whatever the Mac's Wi-Fi network provides.
-
----
-
-## Naming conventions
-
-All VM hostnames follow the pattern `${SITE_LETTER}-<role>`:
-
-| Component        | Site home  | Site cottage | Notes                        |
-|------------------|------------|--------------|------------------------------|
-| Debian KVM host  | h-server00 | c-server00   | Set in preseed + 04-network  |
-| ISP CE router    | h-ce       | c-ce         | OpenWRT, manual config       |
-| WireGuard bastion| h-bastion  | c-bastion    |                              |
-| DHCP/DNS router  | h-router00 | c-router00   |                              |
-| Test VMs         | h-demo-lan10/20/30 | c-demo-lan10/20/30 |               |
-| Bootstrap VM     | jmp00      | jmp00        | Single VM, serves both sites |
-
-The naming is flexible -- site names (home, cottage) and the letter prefix
-(h, c) are just variables in the env files. They can be anything you want
-(e.g. bird names, city names) as long as they are consistent within the env.
-
----
-
-## Images in use
-
-There are two base images, each downloaded once and then prepared locally.
-
-### 1. Debian 12 netinst ISO
-
-Used to install the KVM host (Debian bare metal inside a VMware VM).
-
-```
-Source: https://cdimage.debian.org/cdimage/archive/12.10.0/amd64/iso-cd/
-File:   debian-12.10.0-amd64-netinst.iso
-```
-
-Manipulated by `02-create-server00.sh` (runs on the Mac Intel):
-- Downloaded automatically if not present
-- Preseed config generated from `preseed.cfg.tmpl` + site env + secrets
-- Boot loader patched: text installer set as default, preseed auto-selected
-- Repackaged as `debian-12-preseed-home.iso` / `debian-12-preseed-cottage.iso`
-
-Attach to the VMware host VM for a fully automated Debian install.
-Detach after first reboot.
-
-### 2. Alpine cloud-init (NoCloud) image
-
-Used for all KVMs and for jmp00 (VMware).
-
-```
-Source: https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud/
-File:   nocloud_alpine-3.23.3-x86_64-bios-cloudinit-r0.qcow2
-```
-
-**Step A -- update-alpine-image.sh** (run on a KVM host, repeat periodically):
-- Copies original -> `...-updated.qcow2`
-- Expands image filesystem by +500M
-- Mounts via guestfish and runs `apk update && apk upgrade` inside
-- Clears cloud-init instance state
-- Result stored in `/var/lib/libvirt/images/iso/`
-- scp the result to the other site host to keep both in sync
-
-**Step B -- KVM deployment** (07-create-bastion.sh, 08-create-router00.sh, 09-create-demo-vms.sh):
-- Copies `...-updated.qcow2` -> `/var/lib/libvirt/images/<vm>.qcow2`
-- Resizes the copy to 6G
-- Generates a cidata ISO (meta-data + user-data) with cloud-init config
-- `virt-install` boots the VM with both the disk and the cidata ISO
-- VM reboots once after cloud-init, then operational
-
-**Step C -- jmp00 (01-create-jmp00.sh)** (run on the Mac Intel):
-- Ensures the updated image exists (downloads + runs update-alpine-image.sh if not)
-- Copies and resizes to 6G
-- Converts qcow2 -> VMDK (`qemu-img convert -O vmdk`)
-- Generates the cidata ISO with full jmp00 config (dnsmasq, iptables, routes)
-- Starts the VMware VM automatically with vmrun
-- Requires: brew install qemu (for qemu-img); hdiutil is macOS built-in
-
----
-
-## File structure
+## Repository layout
 
 ```
 .
-|-- site-A.env                  # Site A (home) public config     [git-tracked]
-|-- site-B.env                  # Site B (cottage) public config  [git-tracked]
-|-- secrets-A.env               # Site A secrets                  [gitignored]
-|-- secrets-B.env               # Site B secrets                  [gitignored]
-|-- secrets-A.env.template      # Template -- copy and fill in
+|-- site-A.env                        Site A public config    [git-tracked]
+|-- site-A-real-ce.env                Site A with real CE     [git-tracked]
+|-- site-B.env                        Site B public config    [git-tracked]
+|-- site-B-real-ce.env                Site B with real CE     [git-tracked]
+|-- site-B-pi4-atCottage.env          Site B Pi 4 at cottage  [git-tracked]
+|-- site-B-pi4-simulationAtHome.env   Site B Pi 4 sim at home [git-tracked]
+|
+|-- secrets-A.env                     [gitignored -- fill from template]
+|-- secrets-A-real-ce.env             [gitignored]
+|-- secrets-B.env                     [gitignored]
+|-- secrets-B-real-ce.env             [gitignored]
+|-- secrets-B-pi4.env                 [gitignored]
+|-- secrets-pi4-wg0-core.conf         [gitignored]
+|
+|-- secrets-A.env.template
 |-- secrets-B.env.template
-|-- .gitignore
+|-- secrets-B-pi4.env.template
+|-- secrets-pi4-wg0-core.conf.template
 |
-|-- preseed.cfg.tmpl            # Debian preseed template (%%PLACEHOLDERS%%)
-|-- 02-create-server00.sh         # Mac: builds site-specific preseed ISO
-|-- 01-create-jmp00.sh           # Mac Intel: fully automated jmp00 VM creation
-|-- update-alpine-image.sh      # Host: updates the shared Alpine base image
+|-- preseed.cfg.tmpl                  Debian preseed template
+|-- 01-create-jmp00.sh                Mac Intel: creates jmp00 VMware VM
+|-- 02-create-server00.sh             Mac Intel: builds preseed ISO
+|-- 03-packages.sh                    Host: KVM / OVS / libvirt packages
+|-- 04-network.sh                     Host: OVS + netplan bridges
+|-- 05-libvirt-nets.sh                Host: libvirt networks
+|-- 06-libvirt-config.sh              Host: libvirt suspend/resume config
+|-- 07-create-bastion.sh              KVM: WireGuard bastion
+|-- 08-create-router00.sh             KVM: DHCP / DNS / routing
+|-- 09-create-demo-vms.sh             KVM: demo VMs on LAN10, VLAN20, VLAN30
+|-- 10-bastion-router00-on-pi4.sh     Pi 4: full automated setup (site B)
 |
-|-- 03-packages.sh              # Host: install KVM/OVS/libvirt packages
-|-- 04-network.sh               # Host: configure OVS + netplan bridges
-|-- 05-libvirt-nets.sh          # Host: define libvirt networks
-|-- 06-libvirt-config.sh        # Host: libvirt-guests suspend/resume on host reboot
-|
-|-- 07-create-bastion.sh           # KVM: WireGuard bastion (h-bastion / c-bastion)
-|-- 08-create-router00.sh                 # KVM: DHCP/DNS/routing (h-router00 / c-router00)
-|-- 09-create-demo-vms.sh                 # KVM: test VMs on LAN10, VLAN20, VLAN30
-|
-\-- ce-notes.md                 # OpenWRT CE router manual setup notes
+|-- pi4-bootstrap.md                  Alpine install procedure for the Pi 4
+|-- ce-notes.md                       Legacy simulated CE notes (historical)
+|-- update-alpine-image.sh            Updates the shared Alpine base image
 ```
 
 ---
 
-## Secret management
+## Deployment -- site A (home, Mac Intel + KVM)
 
-1. Copy the templates:
-   ```
-   cp secrets-A.env.template secrets-A.env
-   cp secrets-B.env.template secrets-B.env
-   ```
+### Prerequisites
 
-2. Generate WireGuard keys:
-   ```
-   wg genkey | tee wg-A.key | wg pubkey > wg-A.pub
-   wg genkey | tee wg-B.key | wg pubkey > wg-B.pub
-   ```
-   - secrets-A.env: site-A private key + site-B public key + site-B CE endpoint
-   - secrets-B.env: site-B private key + site-A public key + site-A CE endpoint
-   WG_PEER_ENDPOINT (the remote CE public IP and port) is in secrets, not
-   in site-*.env, to avoid publishing your ISP addresses and WireGuard port.
+- VMware Fusion on Mac Intel
+- jmp00 running (bootstrap gateway and SSH ProxyJump entry point)
+- WireGuard keys generated (see Secret management below)
 
-3. Generate the lab SSH key:
-   ```
-   ssh-keygen -t ed25519 -f ~/.ssh/lab_ed25519 -C "lab@lab"
-   ```
-   Put the public key into LAB_SSH_PUBKEY in both secrets files.
+### jmp00 -- do once, keep running
 
-4. secrets-*.env is in .gitignore -- never commit these files.
+jmp00 is a permanent Alpine VMware VM. It provides internet access to the KVM
+hosts during rebuilds and serves as the SSH ProxyJump entry point into both sites.
 
----
-
-## Deployment workflow
-
-### Phase 0 -- jmp00 (VMware -- do once, keep running forever)
-
-jmp00 must exist before anything else. It is your bootstrap gateway
-(provides internet to hosts during rebuild) and permanent SSH entry
-point into both sites.
-
-Run entirely on the Mac Intel -- no Linux host needed:
-
-```
-# One-time prerequisite:
-brew install qemu           # provides qemu-img
-
-# Then:
-source secrets-A.env        # or secrets-B.env -- same keys for both
+```sh
+source secrets-A.env
 bash 01-create-jmp00.sh
 ```
 
-The script (runs on Linux host):
-- Uses the --updated Alpine image (runs update-alpine-image.sh if missing)
-- Resizes to 6G, converts to VMDK, generates cidata ISO and VMX
-- Outputs to /tmp/jmp00-build/
+Copy the output bundle to your Mac and start with vmrun. See the script header
+for the exact vmrun command.
 
-Then scp the bundle to the Mac and start with vmrun:
-```
-MAC_VM_DIR="$HOME/VirtualMachines/jmp00-lab.vmwarevm"
-scp -r /tmp/jmp00-build/ <mac-user>@<mac-ip>:"$MAC_VM_DIR"
+Add to `~/.ssh/config` on your Mac:
 
-VMLIB="/Applications/VMware Fusion.app/Contents/Library"
-"$VMLIB/vmrun" -T fusion start "$MAC_VM_DIR/jmp00-lab.vmx" nogui
-```
-
-Boot takes ~60s (cloud-init + one reboot). Detach the cidata ISO after.
-
-Note: once macOS is upgraded to Monterey and qemu-img is available via brew,
-01-create-jmp00.sh can be ported to run directly on the Mac.
-
-Add to ~/.ssh/config on your Mac (M2):
 ```
 Host jmp00
     HostName 192.168.86.231
@@ -271,105 +144,179 @@ Host *.cottage.lab
     User lab
 ```
 
-### Phase 1 -- Preseed ISO (Mac Intel -- per site, as needed)
+### VMware network assignments (Mac Intel)
 
 ```
-# Source the site env + secrets, then:
-source site-A.env && source secrets-A.env
+vmnet6    10.0.10.0/24   site A LAN      (h-server00 br-ext, jmp00 eth1)
+vmnet7    10.1.10.0/24   site B LAN sim  (c-server00 br-ext, jmp00 eth2)
+vmnet11   bridged Wi-Fi  management      (jmp00 eth0, server br-mgmt-access)
+```
+
+One additional vmnet bridges the Mac's physical RJ45 NIC so h-bastion can
+reach the real ISP router. The exact vmnet number is set in `site-A-real-ce.env`
+as `IF_ISP_REAL`.
+
+### Build and deploy site A
+
+```sh
+# 1. Preseed ISO (run on Mac Intel)
+source site-A-real-ce.env && source secrets-A-real-ce.env
 bash 02-create-server00.sh
-# Script generates the preseed ISO.
-# -> debian-12-preseed-home.iso
-```
 
-During install and the 03-packages.sh phase, internet goes via jmp00.
-Set in the site env before running 02-create-server00.sh:
-```
-export PRESEED_GW=10.0.10.254   # site home -- jmp00 as bootstrap gateway
-export PRESEED_GW=10.1.10.254   # site cottage
-```
-After 04-network.sh is done and router00 is deployed, restore:
-```
-export PRESEED_GW=${GW_BR_EXT}  # back to router00 (10.x.10.1)
-```
+# 2. Create VM in VMware Fusion, attach ISO, boot (fully automated install)
+#    NIC 1: vmnet6 (LAN)  NIC 2: real-CE vmnet (WAN)  NIC 3: vmnet11 (mgmt)
 
-### Phase 2 -- VMware host VM
-
-Create the VM manually in VMware Fusion:
-- OS: Debian 12 64-bit    Disk: 100G    RAM: 6G    CPU: 2
-- Adapter 1: VNET_LAN  (vmnet6 site A / vmnet7 site B)   -> LAN
-- Adapter 2: VNET_ISP  (vmnet3 site A / vmnet10 site B)  -> ISP
-- Adapter 3: VNET_MGMT (vmnet11 bridged Wi-Fi)           -> management
-- Attach the preseed ISO as CD/DVD
-- Boot -- fully automated install (~10 min), detach ISO after reboot
-
-### Phase 3 -- Host setup
-
-```
-# scp scripts to the host, then:
+# 3. Host setup (run on h-server00)
 sudo bash 03-packages.sh
-
-source site-A.env && source secrets-A.env
-sudo -E bash 04-network.sh
-sudo netplan apply
-# The IP does not change (set by preseed). Session should survive.
-# ping GW and ping 8.8.8.8 will fail here -- router00 not yet deployed.
-# Internet for apt-get during 03-packages.sh worked via jmp00 (PRESEED_GW).
-
+source site-A-real-ce.env && source secrets-A-real-ce.env
+sudo -E bash 04-network.sh && sudo netplan apply
 sudo bash 05-libvirt-nets.sh
 sudo bash 06-libvirt-config.sh
+
+# 4. KVM setup (run on h-server00)
+source site-A-real-ce.env && source secrets-A-real-ce.env
+bash 07-create-bastion.sh
+bash 08-create-router00.sh
+bash 09-create-demo-vms.sh
 ```
 
-### Phase 4 -- KVMs
+---
 
+## Deployment -- site B (cottage, Raspberry Pi 4)
+
+See `pi4-bootstrap.md` for the Alpine install on the Pi 4.
+
+Once Alpine is installed and the Pi is accessible:
+
+```sh
+# 1. Fill in secret files from templates
+cp secrets-B-pi4.env.template         secrets-B-pi4.env
+cp secrets-pi4-wg0-core.conf.template secrets-pi4-wg0-core.conf
+# edit both files -- WireGuard keys, peer endpoint, SSH public key
+
+# 2. Copy all required files to the Pi
+scp site-B-pi4-atCottage.env \
+    secrets-B-pi4.env \
+    secrets-pi4-wg0-core.conf \
+    10-bastion-router00-on-pi4.sh \
+    root@<pi4-ip>:/root/
+
+# 3. Run the setup script on the Pi (as root)
+ash /root/10-bastion-router00-on-pi4.sh
 ```
-source site-A.env && source secrets-A.env
 
-bash 07-create-bastion.sh   # h-bastion: WireGuard + internet gateway
-bash 08-create-router00.sh         # h-router00: DHCP + DNS + inter-VLAN routing
-bash 09-create-demo-vms.sh         # h-demo-lan10/20/30: test VMs
+The script installs packages, writes all config files, enables startup at boot,
+and reboots when done. After the reboot run `/root/lab/test.sh` to verify.
+
+---
+
+## Real-CE port forwarding
+
+Both bastions connect to the internet through your home ISP router. The router
+needs two UDP port forwards, both pointing at the Mac's physical NIC IP on
+the home LAN:
+
+| Forward | UDP port | Destination        | Destination port | Bastion     |
+|---------|----------|--------------------|------------------|-------------|
+| WG-A    | XXXX1    | Mac Intel LAN IP   | 51820            | h-bastion   |
+| WG-B    | XXXX2    | Pi 4 WAN IP (eth1) | 51820            | c-bastion   |
+
+The exact ports and IPs are stored in `secrets-A-real-ce.env` and
+`secrets-B-pi4.env` (both gitignored) as `WG_PEER_ENDPOINT`.
+
+---
+
+## Secret management
+
+```sh
+# 1. Copy templates
+cp secrets-A.env.template         secrets-A.env
+cp secrets-B-pi4.env.template     secrets-B-pi4.env
+cp secrets-pi4-wg0-core.conf.template secrets-pi4-wg0-core.conf
+
+# 2. Generate WireGuard key pairs
+wg genkey | tee wg-A.key | wg pubkey > wg-A.pub
+wg genkey | tee wg-B.key | wg pubkey > wg-B.pub
+
+# 3. Generate the lab SSH key
+ssh-keygen -t ed25519 -f ~/.ssh/lab_ed25519 -C "lab@lab"
+
+# 4. Fill in secrets files:
+#    secrets-A.env:              site A private key, site B public key, site B endpoint
+#    secrets-B-pi4.env:          site B private key, site A public key, site A endpoint, SSH pubkey
+#    secrets-pi4-wg0-core.conf:  site B private key, site A public key, site A endpoint
 ```
 
-### Phase 5 -- CE router (OpenWRT, manual)
-
-See ce-notes.md.
+All `secrets-*.env` and `secrets-*.conf` files are in `.gitignore`.
+Never commit them.
 
 ---
 
 ## End-to-end sanity checks
 
-```
-# From Mac (via jmp00 ProxyJump):
-ssh h-demo-lan30.home.lab traceroute c-demo-lan30.cottage.lab
+```sh
+# From Mac (via jmp00 ProxyJump)
+ssh h-demo-lan30.home.lab traceroute c-router00.cottage.lab
 
 # Expected path:
-#   1  h-router00-vlan30.home.lab    10.0.30.1
-#   2  h-bastion-dmz.home.lab        10.0.1.1
-#   3  c-bastion-wg.cottage.lab      10.0.0.2
-#   4  c-router00-dmz.cottage.lab    10.1.1.2
-#   5  c-demo-lan30.cottage.lab      10.1.30.x
+#   1  h-router00-vlan30   10.0.30.1
+#   2  h-bastion-dmz       10.0.1.1
+#   3  c-bastion-wg        10.0.0.2
+#   4  c-router00-dmz      10.1.1.2
 
-# WireGuard status on bastion:
+# WireGuard handshake (site A)
 ssh h-bastion.home.lab sudo wg show
 
-# Inter-site DNS:
-ssh h-router00.home.lab nslookup c-router00.cottage.lab
-ssh c-router00.cottage.lab nslookup h-router00.home.lab
+# WireGuard handshake (site B -- via ProxyJump through router00 ns)
+ssh -J lab@<pi4-lan-ip> lab@<fmp-d-ip> sudo ip netns exec bastion wg show
 
-# jmp00 DNS (dnsmasq split-horizon):
-ssh jmp00 nslookup h-router00.home.lab
-ssh jmp00 nslookup c-router00.cottage.lab
+# Inter-site DNS
+ssh h-router00.home.lab nslookup c-router00.cottage.lab
+ssh -J lab@<pi4-lan-ip> lab@<fmp-d-ip> sudo ip netns exec router00 nslookup h-router00.home.lab
 ```
 
 ---
 
-## Adding a third site
+## Naming conventions
 
-1. Copy site-A.env -> site-C.env, adjust all IPs, SITE_NAME, SITE_LETTER, domains.
-2. Copy secrets-A.env.template -> secrets-C.env.template, fill in WireGuard keys.
-3. All scripts are site-agnostic: source site-C.env && source secrets-C.env
-   is all that is needed before any script.
-4. Update DNS_STATIC, DNS_REMOTE_DOMAIN, DNS_REMOTE_SERVER in existing site
-   env files to forward the new site domain.
-5. Add a peer block in the new site bastion and in both existing bastions.
-6. Add a server= line in jmp00's dnsmasq.conf for the new site domain,
-   then re-run 01-create-jmp00.sh and redeploy jmp00.
+All hostnames follow the pattern `${SITE_LETTER}-<role>`:
+
+| Component        | Site A (home)      | Site B (cottage)          |
+|------------------|--------------------|---------------------------|
+| KVM host (Debian)| h-server00         | -- (Pi 4, no KVM host)    |
+| WireGuard bastion| h-bastion          | c-bastion (namespace)     |
+| DHCP/DNS router  | h-router00         | c-router00 (namespace)    |
+| Demo VMs         | h-demo-lan10/20/30 | -- (not on Pi 4)          |
+| Bootstrap VM     | jmp00              | jmp00 (shared)            |
+
+The site name, letter prefix, and domain are just variables in the env files
+and can be changed freely.
+
+---
+
+## Alpine base image
+
+All Alpine VMs (KVM and jmp00) use the cloud-init NoCloud image:
+
+```
+Source: https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud/
+File:   nocloud_alpine-3.23.3-x86_64-bios-cloudinit-r0.qcow2
+```
+
+`update-alpine-image.sh` patches and upgrades the image before use.
+The Pi 4 uses a separate ARM Alpine image (see `pi4-bootstrap.md`).
+
+---
+
+## Historical note -- simulated CE routers
+
+Early versions of this lab used two OpenWRT VMs (h-ce, c-ce) to simulate
+ISP CPE routers on a VMware NAT network. They forwarded WireGuard UDP traffic
+to the bastions and gave the lab a realistic NAT traversal scenario without
+requiring a real internet connection.
+
+Those VMs have been retired. Both bastions now connect through real port
+forwards on the home ISP router and use the real public IP as the WireGuard
+endpoint. The OpenWRT setup notes are preserved in `ce-notes.md` for reference.
+The env files `site-A-real-ce.env` and `site-B-real-ce.env` replaced the
+original `site-A.env` / `site-B.env` for the real-internet topology.
