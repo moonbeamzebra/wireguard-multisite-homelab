@@ -300,7 +300,9 @@ EOF
 ##############################
 ## /root/lab/site-B-pi4.env ##
 ##############################
-cp site-B-pi4.env /root/lab/site-B-pi4.env
+# cp site-B-pi4-simulationAtHome.env /root/lab/site-B-pi4.env
+# OR
+cp site-B-pi4-atCottage.env /root/lab/site-B-pi4.env
 
 #############################
 ## /etc/wireguard/wg0.conf ##
