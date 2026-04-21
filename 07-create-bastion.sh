@@ -130,7 +130,7 @@ write_files:
       [Interface]
       Address    = ${WG_ADDR}
       PrivateKey = ${WG_PRIVATE_KEY}
-      ListenPort = 51820
+      ListenPort = ${WG_LISTEN_PORT}
 
       PreUp      = sysctl -w net.ipv4.ip_forward=1
       PostUp     = ip route add ${ROUTE1_NET} via ${ROUTE1_GW} dev eth1 || true
