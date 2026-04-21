@@ -3,8 +3,13 @@
 Multi-site home lab with a WireGuard VPN tunnel connecting two real sites:
 a primary residence (site A, "home") and a secondary residence (site B, "cottage").
 
+To develop the solution:
 Site A runs on a Debian 12 / KVM / OVS stack inside VMware Fusion on a Mac Intel.
-Site B runs on a Raspberry Pi 4 with Alpine Linux.
+Site B runs on a Debian 12 / KVM / OVS stack inside VMware Fusion on a Mac Intel.
+
+Target:
+Site A runs GMKtec Mini PC Ryzen 7640HS - Debian 13 / KVM / OVS stack
+Site B runs GMKtec Mini PC Ryzen 7640HS - Debian 13 / KVM / OVS stack
 
 ---
 
@@ -14,82 +19,49 @@ Site B runs on a Raspberry Pi 4 with Alpine Linux.
 Internet (real public IP)
      |
      |-- Port forward UDP XXXX1 --> Mac Intel NIC --> h-bastion WAN
-     |-- Port forward UDP XXXX2 --> Pi 4 eth1    --> c-bastion WAN
+     |-- Port forward UDP XXXX2 --> Mac Intel NIC --> c-bastion WAN
      |
      +===========================  WireGuard tunnel  ===========================+
      |                                                                          |
      |  Site A -- home                          Site B -- cottage               |
-     |  Mac Intel (VMware Fusion)               Raspberry Pi 4 (Alpine)         |
+     |  Mac Intel (VMware Fusion)               Mac Intel (VMware Fusion)       |
      |                                                                          |
-     |  h-server00 (Debian 12 / KVM)            (no KVM -- single Pi 4)         |
+     |  h-server00 (Debian 12 / KVM)            c-server00 (Debian 12 / KVM)    |
      |    |                                       |                             |
-     |    +-- h-bastion (Alpine KVM)              +-- bastion namespace          |
-     |    |   WAN: 192.168.0.250                      WAN (eth1 USB): varies    |
-     |    |   DMZ: 10.0.1.1/30                        DMZ (veth): 10.1.1.1/30   |
-     |    |   wg0: 10.0.0.1/30 <----tunnel----->      wg0: 10.0.0.2/30          |
-     |    |                                                                      |
-     |    +-- h-router00 (Alpine KVM)            +-- router00 namespace          |
-     |    |   DMZ:   10.0.1.2/30                     DMZ (veth): 10.1.1.2/30    |
-     |    |   LAN10: 10.0.10.1                        LAN (eth0 RJ45): 10.1.10.1 |
-     |    |   VLAN20: 10.0.20.1                                                  |
-     |    |   VLAN30: 10.0.30.1                                                  |
-     |    |                                                                      |
-     |    +-- h-demo-lan10/20/30 (Alpine KVMs)                                  |
-     |                                                                          |
-     +=========================================================================+
+     |    +-- h-bastion (Alpine KVM)              +-- c-bastion (Alpine KVM)    |
+     |    |   WAN: 192.168.0.250                  |   WAN: 192.168.0.251        |
+     |    |   DMZ: 10.0.1.1/30                    |   DMZ: 10.1.1.1/30          |
+     |    |   wg0: 10.0.0.1/30  <----tunnel-----> |   wg0: 10.0.0.2/30          |
+     |    |                                       |                             |
+     |    +-- h-router00 (Alpine KVM)             +-- c-router00 (Alpine KVM)   |
+     |    |   DMZ:   10.0.1.2/30                  |   DMZ:   10.1.1.2/30        |
+     |    |   LAN10: 10.0.10.1                    |   LAN10: 10.1.10.1          |
+     |    |   VLAN20: 10.0.20.1                   |   VLAN20: 10.1.20.1         |
+     |    |   VLAN30: 10.0.30.1                   |   VLAN30: 10.1.30.1         |
+     |    |                                       |                             |
+     |    +-- h-demo-lan10/20/30                  +-- c-demo-lan10/20/30        |
+     |        (Alpine KVMs)                           (Alpine KVMs)             |
+     +==========================================================================+
 ```
 
-### Site B network namespaces on the Pi 4
 
-The Pi 4 runs both bastion and router00 as Linux network namespaces rather than
-separate VMs. A veth pair (v-bastion / v-router00) acts as the DMZ link between
-the two namespaces. The physical interfaces are moved into their respective
-namespaces at boot -- the default namespace holds no production IP.
-
-```
-Pi 4 (Alpine)
-  default ns
-    |-- fmp-d (management veth, for host SSHD only)
-    |
-    +-- bastion ns
-    |     eth1 (USB dongle)  --> ISP modem / WAN
-    |     v-bastion          --> veth DMZ link
-    |     wg0                --> WireGuard tunnel to site A
-    |
-    +-- router00 ns
-          eth0 (integrated)  --> home network LAN / Google Nest
-          v-router00         --> veth DMZ link
-          dnsmasq            --> DHCP + DNS for site B
-```
-
----
 
 ## Repository layout
 
 ```
 .
 |-- site-A.env                        Site A public config    [git-tracked]
-|-- site-A-real-ce.env                Site A with real CE     [git-tracked]
 |-- site-B.env                        Site B public config    [git-tracked]
-|-- site-B-real-ce.env                Site B with real CE     [git-tracked]
-|-- site-B-pi4-atCottage.env          Site B Pi 4 at cottage  [git-tracked]
-|-- site-B-pi4-simulationAtHome.env   Site B Pi 4 sim at home [git-tracked]
 |
 |-- secrets-A.env                     [gitignored -- fill from template]
-|-- secrets-A-real-ce.env             [gitignored]
 |-- secrets-B.env                     [gitignored]
-|-- secrets-B-real-ce.env             [gitignored]
-|-- secrets-B-pi4.env                 [gitignored]
-|-- secrets-pi4-wg0-core.conf         [gitignored]
 |
 |-- secrets-A.env.template
 |-- secrets-B.env.template
-|-- secrets-B-pi4.env.template
-|-- secrets-pi4-wg0-core.conf.template
 |
 |-- preseed.cfg.tmpl                  Debian preseed template
-|-- 01-create-jmp00.sh                Mac Intel: creates jmp00 VMware VM
-|-- 02-create-server00.sh             Mac Intel: builds preseed ISO
+|-- 01-create-jmp00.sh                Mac Intel: creates jmp00 VMware VM (not required when using the mini PCs
+|-- 02-create-server00.sh             Mac Intel: builds preseed ISO (script could be converted to run on Linux since no more Fusion)
 |-- 03-packages.sh                    Host: KVM / OVS / libvirt packages
 |-- 04-network.sh                     Host: OVS + netplan bridges
 |-- 05-libvirt-nets.sh                Host: libvirt networks
@@ -97,10 +69,7 @@ Pi 4 (Alpine)
 |-- 07-create-bastion.sh              KVM: WireGuard bastion
 |-- 08-create-router00.sh             KVM: DHCP / DNS / routing
 |-- 09-create-demo-vms.sh             KVM: demo VMs on LAN10, VLAN20, VLAN30
-|-- 10-bastion-router00-on-pi4.sh     Pi 4: full automated setup (site B)
 |
-|-- pi4-bootstrap.md                  Alpine install procedure for the Pi 4
-|-- ce-notes.md                       Legacy simulated CE notes (historical)
 |-- update-alpine-image.sh            Updates the shared Alpine base image
 ```
 
@@ -110,8 +79,8 @@ Pi 4 (Alpine)
 
 ### Prerequisites
 
-- VMware Fusion on Mac Intel
-- jmp00 running (bootstrap gateway and SSH ProxyJump entry point)
+- VMware Fusion on Mac Intel (not anymore)
+- jmp00 running (bootstrap gateway and SSH ProxyJump entry point) (not anymore)
 - WireGuard keys generated (see Secret management below)
 
 ### jmp00 -- do once, keep running
@@ -153,62 +122,31 @@ vmnet11   bridged Wi-Fi  management      (jmp00 eth0, server br-mgmt-access)
 ```
 
 One additional vmnet bridges the Mac's physical RJ45 NIC so h-bastion can
-reach the real ISP router. The exact vmnet number is set in `site-A-real-ce.env`
-as `IF_ISP_REAL`.
+reach the ISP router.
 
-### Build and deploy site A
+### Build and deploy site A and B
 
 ```sh
 # 1. Preseed ISO (run on Mac Intel)
-source site-A-real-ce.env && source secrets-A-real-ce.env
+source site-A.env && source secrets-A.env (site B : source site-B.env && source secrets-B.env )
 bash 02-create-server00.sh
 
 # 2. Create VM in VMware Fusion, attach ISO, boot (fully automated install)
-#    NIC 1: vmnet6 (LAN)  NIC 2: real-CE vmnet (WAN)  NIC 3: vmnet11 (mgmt)
+#    NIC 1: vmnet6 (LAN)  NIC 2: CE vmnet (WAN)  NIC 3: vmnet11 (mgmt)
 
 # 3. Host setup (run on h-server00)
 sudo bash 03-packages.sh
-source site-A-real-ce.env && source secrets-A-real-ce.env
+source site-A.env && source secrets-A.env  (site B : source site-B.env && source secrets-B.env )
 sudo -E bash 04-network.sh && sudo netplan apply
 sudo bash 05-libvirt-nets.sh
 sudo bash 06-libvirt-config.sh
 
 # 4. KVM setup (run on h-server00)
-source site-A-real-ce.env && source secrets-A-real-ce.env
+source site-A.env && source secrets-A.env  (site B : source site-B.env && source secrets-B.env )
 bash 07-create-bastion.sh
 bash 08-create-router00.sh
 bash 09-create-demo-vms.sh
 ```
-
----
-
-## Deployment -- site B (cottage, Raspberry Pi 4)
-
-See `pi4-bootstrap.md` for the Alpine install on the Pi 4.
-
-Once Alpine is installed and the Pi is accessible:
-
-```sh
-# 1. Fill in secret files from templates
-cp secrets-B-pi4.env.template         secrets-B-pi4.env
-cp secrets-pi4-wg0-core.conf.template secrets-pi4-wg0-core.conf
-# edit both files -- WireGuard keys, peer endpoint, SSH public key
-
-# 2. Copy all required files to the Pi
-scp site-B-pi4-atCottage.env \
-    secrets-B-pi4.env \
-    secrets-pi4-wg0-core.conf \
-    10-bastion-router00-on-pi4.sh \
-    root@<pi4-ip>:/root/
-
-# 3. Run the setup script on the Pi (as root)
-ash /root/10-bastion-router00-on-pi4.sh
-```
-
-The script installs packages, writes all config files, enables startup at boot,
-and reboots when done. After the reboot run `/root/lab/test.sh` to verify.
-
----
 
 ## Real-CE port forwarding
 
@@ -231,8 +169,7 @@ The exact ports and IPs are stored in `secrets-A-real-ce.env` and
 ```sh
 # 1. Copy templates
 cp secrets-A.env.template         secrets-A.env
-cp secrets-B-pi4.env.template     secrets-B-pi4.env
-cp secrets-pi4-wg0-core.conf.template secrets-pi4-wg0-core.conf
+cp secrets-B.env.template         secrets-B.env
 
 # 2. Generate WireGuard key pairs
 wg genkey | tee wg-A.key | wg pubkey > wg-A.pub
@@ -243,11 +180,10 @@ ssh-keygen -t ed25519 -f ~/.ssh/lab_ed25519 -C "lab@lab"
 
 # 4. Fill in secrets files:
 #    secrets-A.env:              site A private key, site B public key, site B endpoint
-#    secrets-B-pi4.env:          site B private key, site A public key, site A endpoint, SSH pubkey
-#    secrets-pi4-wg0-core.conf:  site B private key, site A public key, site A endpoint
+#    secrets-B.env:              site B private key, site A public key, site A endpoint
 ```
 
-All `secrets-*.env` and `secrets-*.conf` files are in `.gitignore`.
+All `secrets-*.env` files are in `.gitignore`.
 Never commit them.
 
 ---
@@ -259,16 +195,18 @@ Never commit them.
 ssh h-demo-lan30.home.lab traceroute c-router00.cottage.lab
 
 # Expected path:
-#   1  h-router00-vlan30   10.0.30.1
-#   2  h-bastion-dmz       10.0.1.1
-#   3  c-bastion-wg        10.0.0.2
-#   4  c-router00-dmz      10.1.1.2
+ 1  h-router00-vlan30.home.lab (10.0.30.1)
+ 2  h-bastion-dmz.home.lab (10.0.1.1)
+ 3  c-bastion-wg.cottage.lab (10.0.0.2)
+ 4  c-router00-dmz.cottage.lab (10.1.1.2)
+ 5  c-demo-lan30.cottage.lab (10.1.30.172)
 
 # WireGuard handshake (site A)
 ssh h-bastion.home.lab sudo wg show
 
-# WireGuard handshake (site B -- via ProxyJump through router00 ns)
-ssh -J lab@<pi4-lan-ip> lab@<fmp-d-ip> sudo ip netns exec bastion wg show
+# WireGuard handshake (site B)
+ssh c-bastion.home.lab sudo wg show
+
 
 # Inter-site DNS
 ssh h-router00.home.lab nslookup c-router00.cottage.lab
