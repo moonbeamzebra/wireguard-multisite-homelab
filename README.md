@@ -132,7 +132,9 @@ source site-A.env && source secrets-A.env (site B : source site-B.env && source 
 bash 02-create-server00.sh
 
 # 2. Create VM in VMware Fusion, attach ISO, boot (fully automated install)
+# Site A : NIC 1: vmnet6 (LAN);  NIC 2: vmnet3 (bastion <-> ce-simulated) ; NIC 3: Bridge WI-FI; NIC 4: Bridge Ethernet (bastion <-> ce-real) 
 #    NIC 1: vmnet6 (LAN)  NIC 2: CE vmnet (WAN)  NIC 3: vmnet11 (mgmt)
+
 
 # 3. Host setup (run on h-server00)
 sudo bash 03-packages.sh
