@@ -1,94 +1,57 @@
 #!/bin/bash
-# 03-packages.sh -- Package installation and base configuration
-# Run on the host (home / cottage) after first boot.
-# Usage: sudo bash 03-packages.sh
-#
-# Prerequisites (handled by preseed.cfg):
-#   - user lab + sudo NOPASSWD
-#   - SSH key in authorized_keys
-#   - 4G swapfile
-#   - openssh-server, sudo, curl already installed
-#   - kvm_intel in /etc/modules-load.d/kvm.conf
-
+# 03-packages.sh -- Version Intel / Debian 13 / Sans Netplan
 set -euo pipefail
 
-echo "=== [03-packages] Start ==="
+echo "=== [03-packages] Start (Intel Host Edition - No Netplan) ==="
 
-# -- Update + install packages -------------------------------------------------
+# -- Mise à jour + Installation des paquets ------------------------------------
 echo "--- apt update + install ---"
+export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y \
-    vim \
-    htop \
-    iputils-ping \
-    bridge-utils \
-    netcat-openbsd \
-    traceroute \
-    tcpdump \
-    dnsutils \
-    cloud-image-utils \
-    libguestfs-tools \
-    netplan.io \
-    lvm2 \
-    qemu-kvm \
-    libvirt-daemon-system \
-    libvirt-clients \
-    virtinst \
-    libosinfo-bin \
-    openvswitch-switch \
-    openvswitch-common
 
-# -- Add lab user to required groups -------------------------------------------
+# Note : On installe 'ifupdown' et 'resolvconf' pour la gestion native du réseau
+# On retire 'netplan.io' de la liste.
+apt-get install -y \
+    vim htop curl wget \
+    iputils-ping bridge-utils netcat-openbsd traceroute tcpdump dnsutils \
+    pciutils \
+    cloud-image-utils libguestfs-tools \
+    lvm2 ifupdown resolvconf \
+    qemu-kvm libvirt-daemon-system libvirt-clients virtinst libosinfo-bin \
+    openvswitch-switch openvswitch-common
+
+# -- Ajout de l'utilisateur lab aux groupes requis -----------------------------
 echo "--- adding lab to libvirt + kvm groups ---"
 usermod -aG libvirt lab
 usermod -aG kvm lab
 
-# -- LIBVIRT_DEFAULT_URI -- idempotent ------------------------------------------
-grep -q LIBVIRT_DEFAULT_URI /home/lab/.bashrc || \
-    echo 'export LIBVIRT_DEFAULT_URI=qemu:///system' >> /home/lab/.bashrc
+# -- Configuration de l'URI Libvirt par défaut ---------------------------------
+grep -q "LIBVIRT_DEFAULT_URI" /home/lab/.bashrc || echo "export LIBVIRT_DEFAULT_URI=qemu:///system" >> /home/lab/.bashrc
 
-# -- OpenVSwitch ---------------------------------------------------------------
+# -- Activation d'Open vSwitch -------------------------------------------------
 echo "--- enabling openvswitch-switch ---"
 systemctl enable --now openvswitch-switch
 
-
-# -- KVM module ----------------------------------------------------------------
+# -- Chargement du module KVM Intel --------------------------------------------
 echo "--- kvm_intel ---"
-modprobe kvm_intel 2>/dev/null && echo "kvm_intel loaded" || echo "WARN: modprobe kvm_intel failed -- reboot required"
-# Already set in /etc/modules-load.d/kvm.conf via preseed
+modprobe kvm_intel 2>/dev/null && echo "kvm_intel loaded" || echo "WARN: kvm_intel failed to load (check VT-x in VMware)"
 
-# -- libvirtd ------------------------------------------------------------------
+# -- Démarrage de libvirtd -----------------------------------------------------
 echo "--- starting libvirtd ---"
-systemctl start libvirtd || true
+systemctl enable --now libvirtd
 
-# -- /var/lib/libvirt/images permissions ---------------------------------------
+# -- Droits sur le stockage des images -----------------------------------------
 echo "--- libvirt/images permissions ---"
 chmod 755 /var/lib/libvirt/images
 mkdir -p /var/lib/libvirt/images/iso
+chown -R root:libvirt /var/lib/libvirt/images
 
-# -- Verification --------------------------------------------------------------
+# -- Vérifications finales -----------------------------------------------------
 echo ""
 echo "=== Checks ==="
+echo -n "OVS         : " && ovs-vsctl --version | head -1
+echo -n "KVM Intel   : " && lsmod | grep -q kvm_intel && echo "OK" || echo "FAIL"
+echo -n "Netplan     : " && command -v netplan >/dev/null && echo "STILL PRESENT" || echo "NOT INSTALLED (OK)"
+echo -n "Network     : " && [ -f /etc/network/interfaces ] && echo "Native Debian (OK)" || echo "Missing /etc/network/interfaces"
 
-echo -n "OVS         : "
-ovs-vsctl --version | head -1
-
-echo -n "KVM module  : "
-lsmod | grep -q kvm && echo "OK" || echo "not yet loaded -- will be active after reboot (kvm.conf OK)"
-
-echo -n "libvirtd    : "
-virsh list &>/dev/null && echo "OK" || echo "ERROR"
-
-
-echo -n "swap        : "
-swapon --show | grep -q swapfile && echo "OK" || echo "MISSING"
-
-echo -n "lab groups  : "
-groups lab
-
-echo -n "sudo NOPASSWD : "
-sudo -n true 2>/dev/null && echo "OK" || echo "ERROR -- check /etc/sudoers.d/lab"
-
-echo ""
-echo "=== [03-packages] Done ==="
-echo "Next step: source site-X.env && source secrets-X.env && sudo -E bash 04-network.sh"
+echo "=== Fin du script 03-packages.sh ==="
