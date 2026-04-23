@@ -10,6 +10,13 @@ secrets-*.conf
 
 *.tar.gz
 
+# Images
+*.qcow2
+
+# arm related
+02-debian13-arm64-create-server00.sh
+preseed.cfg.tmpl.debian13.arm64
+
 # Generated ISOs
 *.iso
 debian-12-preseed-*.iso
