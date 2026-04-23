@@ -1,0 +1,152 @@
+# preseed.cfg.tmpl.debian13.amd64 -- Debian 13 (Trixie) AMD64 (Intel/AMD)
+# Placeholders (%%VAR%%) sont remplacés par votre script de build.
+
+# -- Locale + Clavier ----------------------------------------------------------
+d-i debian-installer/locale string en_US.UTF-8
+d-i keyboard-configuration/xkb-keymap select us
+
+# -- Réseau (IP Statique) ------------------------------------------------------
+d-i netcfg/choose_interface select %%IF_LAN%%
+d-i netcfg/disable_autoconfig boolean true
+d-i netcfg/get_ipaddress string %%PRESEED_IP%%
+d-i netcfg/get_netmask string %%PRESEED_NETMASK%%
+d-i netcfg/get_gateway string %%PRESEED_GW%%
+d-i netcfg/get_nameservers string 8.8.8.8
+d-i netcfg/confirm_static boolean true
+d-i netcfg/get_hostname string %%PRESEED_HOSTNAME%%
+d-i netcfg/get_domain string %%PRESEED_DOMAIN%%
+d-i netcfg/wireless_wep string
+
+# -- Miroir & Firmware ---------------------------------------------------------
+d-i mirror/country string CA
+d-i mirror/http/hostname string deb.debian.org
+d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string
+d-i hw-detect/load_firmware boolean true
+
+# -- Horloge -------------------------------------------------------------------
+d-i clock-setup/utc boolean true
+d-i time/zone string America/Montreal
+d-i clock-setup/ntp boolean true
+
+# -- Noyau (Architecture AMD64) ------------------------------------------------
+d-i base-installer/kernel/image select linux-image-amd64
+
+# -- Partitionnement LVM (Cible /dev/sda pour VMware/SATA) ---------------------
+d-i partman-auto/disk string /dev/sda
+d-i partman-auto/method string lvm
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+
+d-i partman-auto/choose_recipe select custom-lvm
+d-i partman-auto/expert_recipe string        \
+  custom-lvm ::                              \
+    512 512 512 fat32                        \
+      $primary{ }                            \
+      method{ efi }                          \
+      format{ }                              \
+    .                                        \
+    1024 1024 1024 ext4                      \
+      $primary{ }                            \
+      $bootable{ }                           \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ /boot }                    \
+    .                                        \
+    100 1000 -1 ext4                         \
+      $defaultignore{ }                      \
+      $primary{ }                            \
+      method{ lvm }                          \
+      device{ /dev/sda }                     \
+      vg_name{ vg0 }                         \
+    .                                        \
+    10240 10240 10240 ext4                   \
+      $lvmok{ }                              \
+      in_vg{ vg0 }                           \
+      lv_name{ lv-root }                     \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ / }                        \
+    .                                        \
+    8192 8192 8192 ext4                      \
+      $lvmok{ }                              \
+      in_vg{ vg0 }                           \
+      lv_name{ lv-var }                      \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ /var }                     \
+    .                                        \
+    2048 2048 2048 ext4                      \
+      $lvmok{ }                              \
+      in_vg{ vg0 }                           \
+      lv_name{ lv-tmp }                      \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ /tmp }                     \
+    .                                        \
+    20480 20480 20480 ext4                   \
+      $lvmok{ }                              \
+      in_vg{ vg0 }                           \
+      lv_name{ lv-kvm }                      \
+      method{ format }                       \
+      format{ }                              \
+      use_filesystem{ }                      \
+      filesystem{ ext4 }                     \
+      mountpoint{ /var/lib/libvirt/images }  \
+    .
+
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+d-i partman-basicfilesystems/no_swap boolean false
+
+# -- Utilisateurs --------------------------------------------------------------
+d-i passwd/root-login boolean true
+d-i passwd/root-password password %%ROOT_PASSWORD%%
+d-i passwd/root-password-again password %%ROOT_PASSWORD%%
+
+d-i passwd/make-user boolean true
+d-i passwd/user-fullname string lab
+d-i passwd/username string lab
+d-i passwd/user-password password %%LAB_PASSWORD%%
+d-i passwd/user-password-again password %%LAB_PASSWORD%%
+d-i passwd/user-groups string sudo
+
+# -- Paquets -------------------------------------------------------------------
+tasksel tasksel/first multiselect ssh-server, standard
+d-i pkgsel/include string openssh-server sudo curl
+d-i pkgsel/upgrade select full-upgrade
+d-i pkgsel/update-policy select none
+popularity-contest popularity-contest/participate boolean false
+
+# -- GRUB (AMD64 / BIOS & EFI) -------------------------------------------------
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean true
+d-i grub-installer/bootdev string /dev/sda
+
+# -- Post-installation ---------------------------------------------------------
+d-i preseed/late_command string \
+    in-target bash -c 'echo "lab ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/lab && chmod 440 /etc/sudoers.d/lab'; \
+    in-target bash -c 'mkdir -p /home/lab/.ssh && chmod 700 /home/lab/.ssh'; \
+    in-target bash -c 'echo "%%LAB_SSH_PUBKEY%%" > /home/lab/.ssh/authorized_keys'; \
+    in-target bash -c 'chmod 600 /home/lab/.ssh/authorized_keys && chown -R lab:lab /home/lab/.ssh'; \
+    in-target bash -c 'fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile'; \
+    in-target bash -c 'echo /swapfile none swap sw 0 0 >> /etc/fstab'; \
+    in-target bash -c 'echo "export LIBVIRT_DEFAULT_URI=qemu:///system" >> /home/lab/.bashrc'; \
+    in-target bash -c 'echo "kvm_intel" > /etc/modules-load.d/kvm.conf'; \
+    in-target sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="ipv6.disable=1 /' /etc/default/grub; \
+    in-target update-grub
+
+# -- Fin -----------------------------------------------------------------------
+d-i finish-install/reboot_in_progress note
