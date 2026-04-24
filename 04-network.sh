@@ -80,6 +80,7 @@ iface br-dmz inet manual
 
 # --- OPEN VSWITCH (Internal VLAN Trunk) ---
 
+auto ovs-lab
 allow-ovs ovs-lab
 iface ovs-lab inet manual
     ovs_type OVSBridge
