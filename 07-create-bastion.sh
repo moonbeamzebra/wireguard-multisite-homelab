@@ -253,6 +253,13 @@ runcmd:
   - rc-update del cloud-config default 2>/dev/null || true
   - rc-update del cloud-final default 2>/dev/null || true
 
+  - sysctl -w net.ipv6.conf.all.disable_ipv6=1
+  - sysctl -w net.ipv6.conf.default.disable_ipv6=1
+  - sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+  - echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.d/00-disable-ipv6.conf
+  - echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.d/00-disable-ipv6.conf
+  - echo "net.ipv6.conf.lo.disable_ipv6 = 1" >> /etc/sysctl.d/00-disable-ipv6.conf
+
   # Reboot required after package_upgrade: new kernel installed
   # WireGuard and iptables-legacy work correctly after reboot
   - reboot
@@ -280,7 +287,9 @@ virt-install \
     --network network=lan-dmz,mac=${MAC_eth1} \
     --graphics none \
     --import \
-    --noautoconsole
+    --noautoconsole \
+    --memorybacking nosharepages=yes \
+    --cputune shares=4096
 
 virsh autostart ${BASTION_VM_NAME}
 
