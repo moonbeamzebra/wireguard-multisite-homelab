@@ -33,7 +33,7 @@ done
 [[ $MISSING -eq 1 ]] && { echo "=> Run: source site-A.env && source secrets-A.env"; exit 1; }
 
 # -- Alpine cloud-init image ---------------------------------------------------
-IMAGE_NAME=nocloud_alpine-3.23.3-x86_64-bios-cloudinit-r0--updated.qcow2
+IMAGE_NAME=${ALPINE_EFFECTIVE_IMAGE_TO_USE}
 
 MAC_eth0=$(echo "${BASTION_IP_eth0}" | awk -F. '{printf "52:54:%02x:%02x:%02x:%02x\n", $1, $2, $3, $4}')
 MAC_eth1=$(echo "${BASTION_IP_eth1}" | awk -F. '{printf "52:54:%02x:%02x:%02x:%02x\n", $1, $2, $3, $4}')

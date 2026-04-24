@@ -19,7 +19,7 @@ for VAR in SITE_NAME DEMO_VM_PREFIX DEMO_IP_PREFIX LAB_SSH_PUBKEY LAB_PASSWORD R
     fi
 done
 
-IMAGE_NAME=nocloud_alpine-3.23.3-x86_64-bios-cloudinit-r0--updated.qcow2
+IMAGE_NAME=${ALPINE_EFFECTIVE_IMAGE_TO_USE}
 
 echo "==> Site: ${SITE_NAME}  VM prefix: ${DEMO_VM_PREFIX}  IP prefix: ${DEMO_IP_PREFIX}"
 echo ""

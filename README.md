@@ -66,11 +66,11 @@ Internet (real public IP)
 |-- 04-network.sh                     Host: OVS + netplan bridges
 |-- 05-libvirt-nets.sh                Host: libvirt networks
 |-- 06-libvirt-config.sh              Host: libvirt suspend/resume config
+|-- 06.5-update-alpine-image.sh       Updates the shared Alpine base image
 |-- 07-create-bastion.sh              KVM: WireGuard bastion
 |-- 08-create-router00.sh             KVM: DHCP / DNS / routing
 |-- 09-create-demo-vms.sh             KVM: demo VMs on LAN10, VLAN20, VLAN30
-|
-|-- update-alpine-image.sh            Updates the shared Alpine base image
+
 ```
 
 ---
@@ -146,6 +146,7 @@ sudo bash 06-libvirt-config.sh
 
 # 4. KVM setup (run on h-server00)
 source site-A.env && source secrets-A.env  (site B : source site-B.env && source secrets-B.env )
+bash 06.5-update-alpine-image.sh ## Run it on libvirt equipped host
 bash 07-create-bastion.sh
 bash 08-create-router00.sh
 bash 09-create-demo-vms.sh
@@ -244,7 +245,7 @@ Source: https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud/
 File:   nocloud_alpine-3.23.3-x86_64-bios-cloudinit-r0.qcow2
 ```
 
-`update-alpine-image.sh` patches and upgrades the image before use.
+`06.5-update-alpine-image.sh` patches and upgrades the image before use.
 The Pi 4 uses a separate ARM Alpine image (see `pi4-bootstrap.md`).
 
 ---
