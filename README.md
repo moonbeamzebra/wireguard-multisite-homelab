@@ -133,6 +133,7 @@ bash 02-create-server00.sh
 
 # 2. Create VM in VMware Fusion, attach ISO, boot (fully automated install)
 # Site A : NIC 1: vmnet6 (LAN);  NIC 2: vmnet3 (bastion <-> ce-simulated) ; NIC 3: Bridge WI-FI; NIC 4: Bridge Ethernet (bastion <-> ce-real) 
+# Site B : NIC 1: vmnet7 (LAN);  NIC 2: vmnet10 (bastion <-> ce-simulated) ; NIC 3: Bridge WI-FI; NIC 4: Bridge Ethernet (bastion <-> ce-real) 
 #    NIC 1: vmnet6 (LAN)  NIC 2: CE vmnet (WAN)  NIC 3: vmnet11 (mgmt)
 
 
