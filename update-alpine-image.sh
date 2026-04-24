@@ -18,9 +18,23 @@
 
 set -euo pipefail
 
+#https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud/nocloud_alpine-3.23.4-x86_64-bios-cloudinit-r0.qcow2
+IMAGE_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud"
+IMAGE_ORIGINAL_FILE_NAME="nocloud_alpine-3.23.4-x86_64-bios-cloudinit-r0.qcow2"
+
 IMAGE_DIR="/var/lib/libvirt/images/iso"
-IMAGE_ORIGINAL="${IMAGE_DIR}/nocloud_alpine-3.23.3-x86_64-bios-cloudinit-r0.qcow2"
-IMAGE_UPDATED="${IMAGE_DIR}/nocloud_alpine-3.23.3-x86_64-bios-cloudinit-r0--updated.qcow2"
+IMAGE_ORIGINAL="${IMAGE_DIR}/${IMAGE_ORIGINAL_FILE_NAME}"
+IMAGE_UPDATED="${IMAGE_DIR}/${IMAGE_ORIGINAL_FILE_NAME}--updated.qcow2"
+
+sudo mkdir -p ${IMAGE_DIR}
+# -- Download the Debian netinst ISO if not present ----------------------------
+if [[ ! -f "${IMAGE_ORIGINAL}" ]]; then
+    echo "=== Downloading Alpine Linux 3.23.4 ISO ==="
+    wget "${IMAGE_URL}/${IMAGE_ORIGINAL_FILE_NAME}"
+    sudo mv ./${IMAGE_ORIGINAL_FILE_NAME} ${IMAGE_DIR}
+else
+    echo "=== ISO already present: ${IMAGE_ORIGINAL} ==="
+fi
 
 # -- Validate source image -----------------------------------------------------
 if [[ ! -f "${IMAGE_ORIGINAL}" ]]; then
