@@ -17,7 +17,7 @@ apt-get install -y \
     pciutils \
     cloud-image-utils libguestfs-tools \
     lvm2 ifupdown resolvconf \
-    qemu-kvm libvirt-daemon-system libvirt-clients virtinst libosinfo-bin \
+    qemu-kvm libvirt-daemon-system libvirt-clients virtinst libosinfo-bin ksmtuned \
     openvswitch-switch openvswitch-common
 
 # -- Ajout de l'utilisateur lab aux groupes requis -----------------------------
@@ -31,6 +31,9 @@ grep -q "LIBVIRT_DEFAULT_URI" /home/lab/.bashrc || echo "export LIBVIRT_DEFAULT_
 # -- Activation d'Open vSwitch -------------------------------------------------
 echo "--- enabling openvswitch-switch ---"
 systemctl enable --now openvswitch-switch
+
+echo "--- enabling ksmtuned ---"
+systemctl enable --now ksm ksmtuned
 
 # -- Chargement du module KVM Intel --------------------------------------------
 echo "--- kvm_intel ---"
@@ -51,7 +54,6 @@ echo ""
 echo "=== Checks ==="
 echo -n "OVS         : " && ovs-vsctl --version | head -1
 echo -n "KVM Intel   : " && lsmod | grep -q kvm_intel && echo "OK" || echo "FAIL"
-echo -n "Netplan     : " && command -v netplan >/dev/null && echo "STILL PRESENT" || echo "NOT INSTALLED (OK)"
 echo -n "Network     : " && [ -f /etc/network/interfaces ] && echo "Native Debian (OK)" || echo "Missing /etc/network/interfaces"
 
 echo "=== Fin du script 03-packages.sh ==="
