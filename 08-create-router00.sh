@@ -249,6 +249,14 @@ runcmd:
   - rc-update del cloud-init default 2>/dev/null || true
   - rc-update del cloud-config default 2>/dev/null || true
   - rc-update del cloud-final default 2>/dev/null || true
+
+  - sysctl -w net.ipv6.conf.all.disable_ipv6=1
+  - sysctl -w net.ipv6.conf.default.disable_ipv6=1
+  - sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+  - echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.d/00-disable-ipv6.conf
+  - echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.d/00-disable-ipv6.conf
+  - echo "net.ipv6.conf.lo.disable_ipv6 = 1" >> /etc/sysctl.d/00-disable-ipv6.conf
+
   - reboot
 
 EOF
@@ -276,7 +284,9 @@ virt-install \
     --network network=${NET_eth2_portgroup},mac=${MAC_eth2} \
     --graphics none \
     --import \
-    --noautoconsole
+    --noautoconsole \
+    --memorybacking nosharepages=yes \
+    --cputune shares=4096
 
 virsh autostart ${ROUTER00_VM_NAME}
 
