@@ -25,4 +25,5 @@ Paramètres à vérifier avant la génération de l'ISO d'installation.
 ### Options Kernel (GRUB)
 Désactive l'IPv6 nativement et stabilise l'IOMMU pour Ryzen :
 ```text
-d-i debian-installer/add-kernel-opts string quiet amd_iommu=on iommu=pt ipv6.disable=1
+# Ajoute 'pcie_aspm=off' pour désactiver la gestion d'énergie agressive du PCIe
+d-i debian-installer/add-kernel-opts string quiet amd_iommu=on iommu=pt ipv6.disable=1 pcie_aspm=off
