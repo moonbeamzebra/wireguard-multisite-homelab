@@ -17,7 +17,7 @@ apt-get install -y \
     pciutils \
     cloud-image-utils libguestfs-tools \
     lvm2 ifupdown resolvconf \
-    qemu-kvm libvirt-daemon-system libvirt-clients virtinst libosinfo-bin ksmtuned \
+    qemu-kvm libvirt-daemon-system libvirt-clients virtinst libosinfo-bin virt-top ksmtuned \
     openvswitch-switch openvswitch-common
 
 # -- Ajout de l'utilisateur lab aux groupes requis -----------------------------
