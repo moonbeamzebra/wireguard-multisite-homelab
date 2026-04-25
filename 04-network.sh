@@ -104,6 +104,19 @@ bash -c "
     ifup br-ext --force || true
     ifup ovs-lab --force || true
 "
+# Desactiver le passage du trafic bridge dans iptables (Gain de performance CPU)
+cat <<EOF | sudo tee /etc/sysctl.d/99-bridge-performance.conf
+net.bridge.bridge-nf-call-ip6tables = 0
+net.bridge.bridge-nf-call-iptables = 0
+net.bridge.bridge-nf-call-arptables = 0
+EOF
+
+sudo modprobe br_netfilter
+# Ajouter le module au chargement automatique
+echo "br_netfilter" | sudo tee /etc/modules-load.d/br_netfilter.conf
+
+# Charger les parametres immediatement
+sudo sysctl -p /etc/sysctl.d/99-bridge-performance.conf
 
 # -- Verification --------------------------------------------------------------
 echo ""
