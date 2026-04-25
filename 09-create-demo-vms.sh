@@ -79,18 +79,23 @@ chpasswd:
       type: text
 
 runcmd:
+  - apk add --no-cache qemu-guest-agent
+  - rc-update add qemu-guest-agent default
+
+  # IPv6 Hardening
+  - echo "noipv6" >> /etc/dhcpcd.conf
+  # 1. Disable IPv6 at kernel level for next boots
+  - sed -i 's/default_kernel_opts="/default_kernel_opts="ipv6.disable=1 /' /etc/update-extlinux.conf
+  - update-extlinux
+
+  # 2. Silence existing IPv6 sysctl errors by commenting them out
+  - sed -i 's/^net.ipv6/#net.ipv6/' /usr/lib/sysctl.d/00-alpine.conf
+
+  # 3. Clean up cloud-init and other services
   - touch /etc/cloud/cloud-init.disabled
   - rc-update del cloud-init default 2>/dev/null || true
   - rc-update del cloud-config default 2>/dev/null || true
   - rc-update del cloud-final default 2>/dev/null || true
-
-  - sysctl -w net.ipv6.conf.all.disable_ipv6=1
-  - sysctl -w net.ipv6.conf.default.disable_ipv6=1
-  - sysctl -w net.ipv6.conf.lo.disable_ipv6=1
-  - echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.d/00-disable-ipv6.conf
-  - echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.d/00-disable-ipv6.conf
-  - echo "net.ipv6.conf.lo.disable_ipv6 = 1" >> /etc/sysctl.d/00-disable-ipv6.conf
-
   - reboot
 EOF
 
@@ -109,10 +114,11 @@ EOF
         --name ${VM_NAME} \
         --memory 192 \
         --vcpus 1 \
-        --os-variant alpinelinux3.17 \
+        --os-variant alpinelinux3.21 \
         --disk path=/var/lib/libvirt/images/${VM_NAME}.qcow2,format=qcow2 \
         --disk path=/var/lib/libvirt/images/${VM_NAME}-cidata.iso,device=cdrom \
         --network network=${NETWORK},portgroup=${PORTGROUP},mac=${MAC_ADDRESS} \
+        --channel unix,target_type=virtio,name=org.qemu.guest_agent.0 \
         --graphics none \
         --import \
         --noautoconsole
