@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # -- Validate required variables -----------------------------------------------
-for VAR in SITE_NAME PRESEED_HOSTNAME PRESEED_DOMAIN IF_LAN PRESEED_IP PRESEED_NETMASK PRESEED_GW LAB_SSH_PUBKEY LAB_PASSWORD ROOT_PASSWORD; do
+for VAR in SITE_NAME PRESEED_WIRELESS_WPA PRESEED_WIRELESS_ESSID PRESEED_HOSTNAME PRESEED_DOMAIN PRESEED_IF_LAN PRESEED_IP PRESEED_NETMASK PRESEED_GW LAB_SSH_PUBKEY LAB_PASSWORD ROOT_PASSWORD; do
     if [[ -z "${!VAR:-}" ]]; then
         echo "ERROR: missing variable: ${VAR}"
         exit 1
@@ -20,7 +20,7 @@ NETINST_ISO="debian-13.4.0-amd64-netinst.iso"
 NETINST_URL="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd"
 
 
-TMPL_FILE="preseed.cfg.tmpl.debian13.amd64"
+TMPL_FILE="preseed.cfg.tmpl.debian13.amd64.wifi.GMKtec"
 OUTPUT_ISO="debian-13-preseed-amd64-${SITE_NAME}.iso"
 WORK_DIR="/tmp/debian-preseed-build-${SITE_NAME}"
 
@@ -69,10 +69,12 @@ cp "${TMPL_FILE}" "${PRESEED_OUT}"
 # Utilisation directe de sed (GNU sed par défaut sur Linux)
 sed -i "s|%%PRESEED_HOSTNAME%%|$(_escape "${PRESEED_HOSTNAME}")|g" "${PRESEED_OUT}"
 sed -i "s|%%PRESEED_DOMAIN%%|$(_escape "${PRESEED_DOMAIN}")|g"     "${PRESEED_OUT}"
-sed -i "s|%%IF_LAN%%|$(_escape "${IF_LAN}")|g"                     "${PRESEED_OUT}"
+sed -i "s|%%PRESEED_IF_LAN%%|$(_escape "${PRESEED_IF_LAN}")|g"     "${PRESEED_OUT}"
 sed -i "s|%%PRESEED_IP%%|$(_escape "${PRESEED_IP}")|g"             "${PRESEED_OUT}"
 sed -i "s|%%PRESEED_NETMASK%%|$(_escape "${PRESEED_NETMASK}")|g"   "${PRESEED_OUT}"
 sed -i "s|%%PRESEED_GW%%|$(_escape "${PRESEED_GW}")|g"             "${PRESEED_OUT}"
+sed -i "s|%%PRESEED_WIRELESS_ESSID%%|$(_escape "${PRESEED_WIRELESS_ESSID}")|g" "${PRESEED_OUT}"
+sed -i "s|%%PRESEED_WIRELESS_WPA%%|$(_escape "${PRESEED_WIRELESS_WPA}")|g" "${PRESEED_OUT}"
 sed -i "s|%%LAB_SSH_PUBKEY%%|$(_escape "${LAB_SSH_PUBKEY}")|g"     "${PRESEED_OUT}"
 sed -i "s|%%LAB_PASSWORD%%|$(_escape "${LAB_PASSWORD}")|g"         "${PRESEED_OUT}"
 sed -i "s|%%ROOT_PASSWORD%%|$(_escape "${ROOT_PASSWORD}")|g"       "${PRESEED_OUT}"
