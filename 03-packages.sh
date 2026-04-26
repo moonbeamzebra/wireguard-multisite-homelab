@@ -1,8 +1,8 @@
 #!/bin/bash
-# 03-packages.sh -- Version Intel / Debian 13 / Sans Netplan
+# 03-packages.sh -- Version AMD / Debian 13 / Sans Netplan
 set -euo pipefail
 
-echo "=== [03-packages] Start (Intel Host Edition - No Netplan) ==="
+echo "=== [03-packages] Start (AMD Host Edition - No Netplan) ==="
 
 # -- Mise à jour + Installation des paquets ------------------------------------
 echo "--- apt update + install ---"
@@ -35,9 +35,9 @@ systemctl enable --now openvswitch-switch
 echo "--- enabling ksmtuned ---"
 systemctl enable --now ksm ksmtuned
 
-# -- Chargement du module KVM Intel --------------------------------------------
-echo "--- kvm_intel ---"
-modprobe kvm_intel 2>/dev/null && echo "kvm_intel loaded" || echo "WARN: kvm_intel failed to load (check VT-x in VMware)"
+# -- Chargement du module KVM AMD --------------------------------------------
+echo "--- kvm_amd ---"
+modprobe kvm_amd 2>/dev/null && echo "kvm_amd loaded" || echo "WARN: kvm_amd failed to load (check VT-x in VMware)"
 
 # -- Démarrage de libvirtd -----------------------------------------------------
 echo "--- starting libvirtd ---"
@@ -53,7 +53,7 @@ chown -R root:libvirt /var/lib/libvirt/images
 echo ""
 echo "=== Checks ==="
 echo -n "OVS         : " && ovs-vsctl --version | head -1
-echo -n "KVM Intel   : " && lsmod | grep -q kvm_intel && echo "OK" || echo "FAIL"
+echo -n "KVM AMD     : " && lsmod | grep -q kvm_amd && echo "OK" || echo "FAIL"
 echo -n "Network     : " && [ -f /etc/network/interfaces ] && echo "Native Debian (OK)" || echo "Missing /etc/network/interfaces"
 
 echo "=== Fin du script 03-packages.sh ==="
