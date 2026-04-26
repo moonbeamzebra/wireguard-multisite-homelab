@@ -128,8 +128,8 @@ reach the ISP router.
 
 ```sh
 # 1. Preseed ISO (run on Mac Intel)
-source site-A.env && source secrets-A.env (site B : source site-B.env && source secrets-B.env )
-bash 02-debian13-amd64-create-server00.sh
+source site-A-GMKtec.env && source secrets-A-GMKtec.env (site B : source site-B-GMKtec.env && source secrets-B-GMKtec.env )
+bash 02-create-server00.sh
 
 # 2. Create VM in VMware Fusion, attach ISO, boot (fully automated install)
 # Site A : NIC 1: vmnet6 (LAN);  NIC 2: vmnet3 (bastion <-> ce-simulated) ; NIC 3: Bridge WI-FI; NIC 4: Bridge Ethernet (bastion <-> ce-real) 
@@ -138,7 +138,7 @@ bash 02-debian13-amd64-create-server00.sh
 
 
 # 3. Host setup (run on h-server00)
-source site-A.env && source secrets-A.env  (site B : source site-B.env && source secrets-B.env )
+source site-A-GMKtec.env && source secrets-A-GMKtec.env  (site B : source site-B-GMKtec.env && source secrets-B-GMKtec.env )
 sudo bash 03-packages.sh
 
 # Go get a fresh alpine image
@@ -150,12 +150,12 @@ bash 03b-download-update-alpine-image.sh
 
 sudo -E bash 04-network.sh
 sudo reboot
-source site-A.env && source secrets-A.env  (site B : source site-B.env && source secrets-B.env )
+source site-A-GMKtec.env && source secrets-A-GMKtec.env  (site B : source site-B-GMKtec.env && source secrets-B-GMKtec.env )
 sudo bash 05-libvirt-nets.sh
 sudo bash 06-libvirt-config.sh
 
 # 4. KVM setup (run on h-server00)
-source site-A.env && source secrets-A.env  (site B : source site-B.env && source secrets-B.env )
+source site-A-GMKtec.env && source secrets-A-GMKtec.env  (site B : source site-B-GMKtec.env && source secrets-B-GMKtec.env )
 bash 07-create-bastion.sh
 bash 08-create-router00.sh
 bash 09-create-demo-vms.sh
