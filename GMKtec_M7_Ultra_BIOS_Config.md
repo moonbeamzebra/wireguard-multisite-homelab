@@ -151,6 +151,37 @@ lscpu | grep Virtualization
 dmesg | grep -i iommu
 ip a
 systemctl status libvirtd
+# Vérifier le microcode (sécurité CPU)
+# (Tu devrais voir "updated to revision...") :
+journalctl -k | grep -i microcode 
+# Vérifier l'état du PCIe ASPM (nos réglages de latence) 
+# (Tu devrais voir "L0s- L1-", confirmant que c'est désactivé) :
+lspci -vv | grep ASPM 
+# Vérifier la température (pour voir si le mode Performance chauffe trop au repos) :
+# (nécessite sudo apt install lm-sensors puis sudo sensors-detect).
+sensors 
+
+# Verifier les drivers (pilotes)
+#Résumé des commandes utiles
+#Matériel 	Commande recommandée
+SSD / PCI:	        lspci -k
+Périphériques USB:	lsusb -t
+Carte Réseau:	    ethtool -i <interface>
+Tout le système:	sudo lshw -c network -c storage -c disk
+
+Dans les KVM Alpine bastion et router00
+# On devrait voir 2
+ethtool -l eth0 | egrep -i combined
+# On devfrait voir:
+# tcp-segmentation-offload: on
+# generic-segmentation-offload: on
+# generic-receive-offload: on
+# rx-checksumming: on / tx-checksumming: on
+ethtool -k eth0 | egrep '(tcp-segmentation-offload|generic-segmentation-offload|generic-receive-offload|x-checksumming)'
+# On devrait voir:
+# Adaptive RX: off et rx-usecs: 0
+ethtool -c eth0
+
 ```
 
 ---
