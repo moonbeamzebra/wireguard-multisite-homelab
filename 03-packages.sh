@@ -16,7 +16,7 @@ apt-get install -y \
     iputils-ping bridge-utils netcat-openbsd traceroute tcpdump dnsutils \
     pciutils \
     cloud-image-utils libguestfs-tools \
-    lvm2 ifupdown resolvconf \
+    lvm2 ifupdown resolvconf lm-sensors ethtool \
     qemu-kvm libvirt-daemon-system libvirt-clients virtinst libosinfo-bin virt-top ksmtuned \
     openvswitch-switch openvswitch-common
 
