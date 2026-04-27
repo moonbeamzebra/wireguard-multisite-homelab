@@ -87,7 +87,7 @@ d-i partman-auto/expert_recipe string        \
       filesystem{ ext4 }                     \
       mountpoint{ /var }                     \
     .                                        \
-    2048 2048 2048 ext4                      \
+    10240 10240 10240 ext4                   \
       $lvmok{ }                              \
       in_vg{ vg0 }                           \
       lv_name{ lv-tmp }                      \
@@ -97,7 +97,7 @@ d-i partman-auto/expert_recipe string        \
       filesystem{ ext4 }                     \
       mountpoint{ /tmp }                     \
     .                                        \
-    524288 524288 524288 ext4                \
+    102400 102400 102400 ext4                \
       $lvmok{ }                              \
       in_vg{ vg0 }                           \
       lv_name{ lv-kvm }                      \
@@ -152,7 +152,7 @@ d-i preseed/late_command string \
     in-target bash -c 'mkdir -p /home/lab/.ssh && chmod 700 /home/lab/.ssh'; \
     in-target bash -c 'echo "%%LAB_SSH_PUBKEY%%" > /home/lab/.ssh/authorized_keys'; \
     in-target bash -c 'chmod 600 /home/lab/.ssh/authorized_keys && chown -R lab:lab /home/lab/.ssh'; \
-    in-target bash -c 'fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile'; \
+    in-target bash -c 'fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile'; \
     in-target bash -c 'echo "/swapfile none swap sw 0 0" >> /etc/fstab'; \
     in-target bash -c 'echo "export LIBVIRT_DEFAULT_URI=qemu:///system" >> /home/lab/.bashrc'; \
     in-target bash -c 'echo "kvm_amd" > /etc/modules-load.d/kvm.conf'; \
