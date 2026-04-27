@@ -94,6 +94,13 @@ eno1 (altname enp2s0) : RJ45 de gauche
 
 disk : nvme0n1     259:0    0 953.9G  0 disk
 
+Petit conseil pour ton 04-network.sh :
+Puisque tu vas avoir deux fichiers de configuration réseau, quand ton script de réseau s'exécutera, il modifiera probablement /etc/network/interfaces pour ajouter tes bridges (br-ext, ovs-lab).
+Pour éviter que ton Wi-Fi ne tombe à ce moment-là, ne fais pas systemctl restart networking. Utilise plutôt des commandes ciblées pour monter tes nouveaux bridges :
+bash
+ifup br-ext
+ifup ovs-lab
+
 
 
 
