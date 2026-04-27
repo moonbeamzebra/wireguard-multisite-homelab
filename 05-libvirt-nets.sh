@@ -13,7 +13,7 @@ set -euo pipefail
 echo "=== [05-libvirt-nets] Start ==="
 
 virsh list &>/dev/null || { echo "ERROR: libvirt not accessible"; exit 1; }
-for br in br-isp br-dmz br-ext br-mgmt-access ovs-lab; do
+for br in br-isp br-dmz br-ext ovs-lab; do
     ip link show "${br}" &>/dev/null || { echo "ERROR: bridge ${br} missing -- run 04-network.sh first"; exit 1; }
 done
 
@@ -41,15 +41,6 @@ cat > /tmp/libvirt-nets/lan-isp.xml << EOF
   <${NN}>lan-isp</${NN}>
   <forward mode="bridge"/>
   <bridge ${NN}="br-isp"/>
-  <portgroup ${NN}="lanips" default="yes"/>
-</network>
-EOF
-
-cat > /tmp/libvirt-nets/lan-isp-real.xml << EOF
-<network>
-  <${NN}>lan-isp-real</${NN}>
-  <forward mode="bridge"/>
-  <bridge ${NN}="br-isp-real"/>
   <portgroup ${NN}="lanips" default="yes"/>
 </network>
 EOF
@@ -88,21 +79,10 @@ cat > /tmp/libvirt-nets/lan-int.xml << EOF
 </network>
 EOF
 
-cat > /tmp/libvirt-nets/lan-mgmt-access.xml << EOF
-<network>
-  <${NN}>lan-mgmt-access</${NN}>
-  <forward mode="bridge"/>
-  <bridge ${NN}="br-mgmt-access"/>
-  <portgroup ${NN}="lan-mgmt-acc" default="yes"/>
-</network>
-EOF
-
 define_network "lan-isp"    /tmp/libvirt-nets/lan-isp.xml
-define_network "lan-isp-real"    /tmp/libvirt-nets/lan-isp-real.xml
 define_network "lan-dmz"    /tmp/libvirt-nets/lan-dmz.xml
 define_network "lan-ext"    /tmp/libvirt-nets/lan-ext.xml
 define_network "lan-int"    /tmp/libvirt-nets/lan-int.xml
-define_network "lan-mgmt-access" /tmp/libvirt-nets/lan-mgmt-access.xml
 
 echo ""
 echo "=== Active libvirt networks ==="
