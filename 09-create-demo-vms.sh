@@ -24,15 +24,17 @@ IMAGE_NAME=${ALPINE_EFFECTIVE_IMAGE_TO_USE}
 echo "==> Site: ${SITE_NAME}  VM prefix: ${DEMO_VM_PREFIX}  IP prefix: ${DEMO_IP_PREFIX}"
 echo ""
 
-for LAN_NUMBER in 10 20 30; do
+for LAN_NUMBER in 5 10 20 30; do
 
     PORTGROUP=lan${LAN_NUMBER}
     VM_NAME=${DEMO_VM_PREFIX}-${PORTGROUP}
     PSEUDO_IP=${DEMO_IP_PREFIX}.${LAN_NUMBER}.${LAN_NUMBER}
     MAC_ADDRESS=$(echo "${PSEUDO_IP}" | awk -F. '{printf "52:54:%02x:%02x:%02x:%02x\n", $1, $2, $3, $4}')
 
-    if [[ "${LAN_NUMBER}" = "10" ]]; then
-        NETWORK=lan-ext
+    if [[ "${LAN_NUMBER}" = "5" ]]; then
+        NETWORK=lan-ext5
+    elif [[ "${LAN_NUMBER}" = "10" ]]; then
+        NETWORK=lan-ext10
     else
         NETWORK=lan-int
     fi
@@ -79,7 +81,7 @@ chpasswd:
       type: text
 
 runcmd:
-  - apk add --no-cache qemu-guest-agent
+  - apk add --no-cache qemu-guest-agent tcpdump
   - rc-update add qemu-guest-agent default
 
   # IPv6 Hardening
