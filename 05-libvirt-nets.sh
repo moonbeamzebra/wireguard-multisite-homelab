@@ -5,7 +5,7 @@
 # Creates five libvirt networks, each backed by an existing host bridge:
 #   lan-isp   -> br-isp    (bastion WAN)
 #   lan-dmz   -> br-dmz    (bastion <-> router00 /30)
-#   lan-ext   -> br-ext    (LAN10 untagged)
+#   lan-ext10 -> br-ext10    (LAN10 untagged)
 #   lan-int   -> ovs-lab   (OVS trunk -- VLANs 20, 30)
 #   lan-mgmt-access -> br-mgmt-access (jump VM management)
 
@@ -13,7 +13,7 @@ set -euo pipefail
 echo "=== [05-libvirt-nets] Start ==="
 
 virsh list &>/dev/null || { echo "ERROR: libvirt not accessible"; exit 1; }
-for br in br-isp br-dmz br-ext ovs-lab; do
+for br in br-isp br-dmz br-ext10 ovs-lab; do
     ip link show "${br}" &>/dev/null || { echo "ERROR: bridge ${br} missing -- run 04-network.sh first"; exit 1; }
 done
 
@@ -54,11 +54,20 @@ cat > /tmp/libvirt-nets/lan-dmz.xml << EOF
 </network>
 EOF
 
-cat > /tmp/libvirt-nets/lan-ext.xml << EOF
+cat > /tmp/libvirt-nets/lan-ext5.xml << EOF
 <network>
-  <${NN}>lan-ext</${NN}>
+  <${NN}>lan-ext5</${NN}>
   <forward mode="bridge"/>
-  <bridge ${NN}="br-ext"/>
+  <bridge ${NN}="br-ext5"/>
+  <portgroup ${NN}="lan5" default="yes"/>
+</network>
+EOF
+
+cat > /tmp/libvirt-nets/lan-ext10.xml << EOF
+<network>
+  <${NN}>lan-ext10</${NN}>
+  <forward mode="bridge"/>
+  <bridge ${NN}="br-ext10"/>
   <portgroup ${NN}="lan10" default="yes"/>
 </network>
 EOF
@@ -81,7 +90,8 @@ EOF
 
 define_network "lan-isp"    /tmp/libvirt-nets/lan-isp.xml
 define_network "lan-dmz"    /tmp/libvirt-nets/lan-dmz.xml
-define_network "lan-ext"    /tmp/libvirt-nets/lan-ext.xml
+define_network "lan-ext5"    /tmp/libvirt-nets/lan-ext5.xml
+define_network "lan-ext10"    /tmp/libvirt-nets/lan-ext10.xml
 define_network "lan-int"    /tmp/libvirt-nets/lan-int.xml
 
 echo ""
