@@ -25,6 +25,8 @@ REQUIRED_VARS="SITE_NAME ROUTER00_VM_NAME ROUTER00_HOSTNAME PRIMARY_DOMAIN
                ROUTER00_IP_eth0 ROUTER00_MASK_eth0 ROUTER00_GW_eth0
                ROUTER00_IP_eth1 ROUTER00_MASK_eth1
                ROUTER00_IP_eth2_20 ROUTER00_IP_eth2_30
+               ROUTER00_IP_eth3
+               DHCP_LAN5_START DHCP_LAN5_END
                DHCP_LAN10_START DHCP_LAN10_END
                DHCP_VLAN20_START DHCP_VLAN20_END
                DHCP_VLAN30_START DHCP_VLAN30_END
@@ -32,7 +34,7 @@ REQUIRED_VARS="SITE_NAME ROUTER00_VM_NAME ROUTER00_HOSTNAME PRIMARY_DOMAIN
                DNS_REMOTE_REVERSE DNS_REMOTE_REVERSE_SERVER
                DNS_STATIC
                IPTABLES_ETH0_ACCEPT_1 IPTABLES_ETH0_ACCEPT_2
-               NET_eth0 NET_eth1_portgroup NET_eth2_portgroup
+               NET_eth0 NET_eth1_portgroup NET_eth2_portgroup NET_eth3_portgroup
                LAB_SSH_PUBKEY LAB_PASSWORD ROOT_PASSWORD"
 
 MISSING=0
@@ -45,6 +47,7 @@ IMAGE_NAME=${ALPINE_EFFECTIVE_IMAGE_TO_USE}
 MAC_eth0=$(echo "${ROUTER00_IP_eth0}"    | awk -F. '{printf "52:54:%02x:%02x:%02x:%02x\n", $1, $2, $3, $4}')
 MAC_eth1=$(echo "${ROUTER00_IP_eth1}"    | awk -F. '{printf "52:54:%02x:%02x:%02x:%02x\n", $1, $2, $3, $4}')
 MAC_eth2=$(echo "${ROUTER00_IP_eth2_20}" | awk -F. '{printf "52:54:%02x:%02x:%02x:%02x\n", $1, $2, $3, $4}')
+MAC_eth3=$(echo "${ROUTER00_IP_eth3}"    | awk -F. '{printf "52:54:%02x:%02x:%02x:%02x\n", $1, $2, $3, $4}')
 
 echo "==> Site       : ${SITE_NAME}"
 echo "==> VM         : ${ROUTER00_VM_NAME}"
@@ -128,11 +131,21 @@ write_files:
           address ${ROUTER00_IP_eth2_30}
           netmask 255.255.255.0
 
+      # LAN5 (Dongle UGREEN / Salle des machines)
+      auto eth3
+      iface eth3 inet static
+          address ${ROUTER00_IP_eth3}
+          netmask 255.255.255.0
+          post-up ethtool -K eth3 tx on sg on tso on gso on gro on lro on || true
+          post-up ethtool -C eth3 rx-usecs 0 || true
+
+  # --- DNS: Dnsmasq main config ---
   - path: /etc/dnsmasq.conf
     content: |
       interface=eth1
       interface=eth2.20
       interface=eth2.30
+      interface=eth3
       bind-interfaces
       expand-hosts
       domain=${PRIMARY_DOMAIN}
@@ -141,15 +154,27 @@ write_files:
       server=8.8.4.4
       server=/${DNS_REMOTE_DOMAIN}/${DNS_REMOTE_SERVER}
       dhcp-option=option:domain-search,${PRIMARY_DOMAIN},${DNS_REMOTE_DOMAIN}
+
+      # LAN 5 (Legacy Lab)
+      dhcp-range=${DHCP_LAN5_START},${DHCP_LAN5_END},24h
+      dhcp-option=interface:eth3,3,${ROUTER00_IP_eth3}
+      dhcp-option=interface:eth3,6,${ROUTER00_IP_eth3}
+
+      # LAN 10
       dhcp-range=${DHCP_LAN10_START},${DHCP_LAN10_END},24h
-      dhcp-option=3,${ROUTER00_IP_eth1}
-      dhcp-option=6,${ROUTER00_IP_eth1}
+      dhcp-option=interface:eth1,3,${ROUTER00_IP_eth1}
+      dhcp-option=interface:eth1,6,${ROUTER00_IP_eth1}
+
+      # VLAN 20
       dhcp-range=set:vlan20,${DHCP_VLAN20_START},${DHCP_VLAN20_END},24h
       dhcp-option=tag:vlan20,3,${ROUTER00_IP_eth2_20}
       dhcp-option=tag:vlan20,6,${ROUTER00_IP_eth2_20}
+
+      # VLAN 30
       dhcp-range=set:vlan30,${DHCP_VLAN30_START},${DHCP_VLAN30_END},24h
       dhcp-option=tag:vlan30,3,${ROUTER00_IP_eth2_30}
       dhcp-option=tag:vlan30,6,${ROUTER00_IP_eth2_30}
+
       server=/${DNS_REMOTE_REVERSE}/${DNS_REMOTE_REVERSE_SERVER}
       conf-dir=/etc/dnsmasq.d/,*.conf
 
@@ -175,19 +200,35 @@ ${DNS_STATIC}
       -A INPUT -i eth1    -j ACCEPT
       -A INPUT -i eth2.20 -j ACCEPT
       -A INPUT -i eth2.30 -j ACCEPT
+      -A INPUT -i eth3    -j ACCEPT
+
       -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
       -A FORWARD -i eth0 -o eth1 -j ACCEPT
       -A FORWARD -i eth0 -o eth2.20 -j ACCEPT
       -A FORWARD -i eth0 -o eth2.30 -j ACCEPT
+      -A FORWARD -i eth0 -o eth3 -j ACCEPT
+
       -A FORWARD -i eth1 -o eth0 -j ACCEPT
-      -A FORWARD -i eth2.20 -o eth0 -j ACCEPT
-      -A FORWARD -i eth2.30 -o eth0 -j ACCEPT
       -A FORWARD -i eth1 -o eth2.20 -j ACCEPT
       -A FORWARD -i eth1 -o eth2.30 -j ACCEPT
+      -A FORWARD -i eth1 -o eth3 -j ACCEPT
+
+      -A FORWARD -i eth2.20 -o eth0 -j ACCEPT
       -A FORWARD -i eth2.20 -o eth1 -j ACCEPT
-      -A FORWARD -i eth2.30 -o eth1 -j ACCEPT
       -A FORWARD -i eth2.20 -o eth2.30 -j ACCEPT
+      -A FORWARD -i eth2.20 -o eth3 -j ACCEPT
+
+      -A FORWARD -i eth2.30 -o eth0 -j ACCEPT
+      -A FORWARD -i eth2.30 -o eth1 -j ACCEPT
       -A FORWARD -i eth2.30 -o eth2.20 -j ACCEPT
+      -A FORWARD -i eth2.30 -o eth3 -j ACCEPT
+
+      -A FORWARD -i eth3 -o eth0 -j ACCEPT
+      -A FORWARD -i eth3 -o eth1 -j ACCEPT
+      -A FORWARD -i eth3 -o eth2.20 -j ACCEPT
+      -A FORWARD -i eth3 -o eth2.20 -j ACCEPT
+
       COMMIT
 
 runcmd:
@@ -244,13 +285,14 @@ virt-install \
     --network network=${NET_eth0},mac=${MAC_eth0},model=virtio,driver.name=vhost,driver.queues=2 \
     --network network=${NET_eth1_portgroup},mac=${MAC_eth1},model=virtio,driver.name=vhost,driver.queues=2 \
     --network network=${NET_eth2_portgroup},mac=${MAC_eth2},model=virtio,driver.name=vhost,driver.queues=2 \
+    --network network=${NET_eth3_portgroup},mac=${MAC_eth3},model=virtio,driver.name=vhost,driver.queues=2 \
     --graphics none \
     --import \
     --noautoconsole \
     --memorybacking nosharepages=yes,locked=yes \
-    --cputune vcpupin0.vcpu=0,vcpupin0.cpuset=1,vcpupin1.vcpu=1,vcpupin1.cpuset=2,shares=4096
+    --cputune vcpupin0.vcpu=0,vcpupin0.cpuset=4,vcpupin1.vcpu=1,vcpupin1.cpuset=5,shares=4096 \
+    --autostart
 
-virsh autostart ${ROUTER00_VM_NAME}
 rm -rf ${CIDATA}
 
 echo ""
