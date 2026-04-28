@@ -235,7 +235,7 @@ virt-install \
     --import \
     --noautoconsole \
     --memorybacking nosharepages=yes,locked=yes \
-    --cputune vcpupin0.vcpu=0,vcpupin0.cpuset=1,vcpupin1.vcpu=1,vcpupin1.cpuset=2,shares=4096
+    --cputune vcpupin0.vcpu=0,vcpupin0.cpuset=2,vcpupin1.vcpu=1,vcpupin1.cpuset=3,shares=4096
 
 virsh autostart ${BASTION_VM_NAME}
 rm -rf ${CIDATA}
