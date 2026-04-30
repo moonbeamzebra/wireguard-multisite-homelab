@@ -152,8 +152,8 @@ d-i preseed/late_command string \
     in-target bash -c 'mkdir -p /home/lab/.ssh && chmod 700 /home/lab/.ssh'; \
     in-target bash -c 'echo "%%LAB_SSH_PUBKEY%%" > /home/lab/.ssh/authorized_keys'; \
     in-target bash -c 'chmod 600 /home/lab/.ssh/authorized_keys && chown -R lab:lab /home/lab/.ssh'; \
-    in-target bash -c 'fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile'; \
-    in-target bash -c 'echo "/swapfile none swap sw 0 0" >> /etc/fstab'; \
+    in-target bash -c 'fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon --priority 10 /swapfile'; \
+    in-target bash -c 'echo "/swapfile none swap sw,pri=10 0 0" >> /etc/fstab'; \
     in-target bash -c 'echo "export LIBVIRT_DEFAULT_URI=qemu:///system" >> /home/lab/.bashrc'; \
     in-target bash -c 'echo "kvm_amd" > /etc/modules-load.d/kvm.conf'; \
     in-target sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="quiet amd_iommu=on iommu=pt ipv6.disable=1 pcie_aspm=off /' /etc/default/grub; \
