@@ -14,7 +14,7 @@ apt-get update -y
 apt-get install -y \
     vim htop curl wget \
     iputils-ping bridge-utils netcat-openbsd traceroute tcpdump dnsutils \
-    pciutils \
+    pciutils zram-tools rsync \
     cloud-image-utils libguestfs-tools \
     lvm2 ifupdown resolvconf lm-sensors ethtool \
     qemu-kvm libvirt-daemon-system libvirt-clients virtinst libosinfo-bin virt-top ksmtuned \
@@ -48,6 +48,45 @@ echo "--- libvirt/images permissions ---"
 chmod 755 /var/lib/libvirt/images
 mkdir -p /var/lib/libvirt/images/iso
 chown -R root:libvirt /var/lib/libvirt/images
+
+cat << EOF | sudo tee /etc/default/zramswap
+ALGO=zstd
+PERCENT=50
+PRIORITY=100
+EOF
+sudo systemctl restart zramswap
+
+cat << EOF | sudo tee /etc/motd
+================================================================================
+  BARE METAL HOST - SITE: ${SITE_NAME^^}
+================================================================================
+  Hardware: GMKtec M7 Ultra (Ryzen 6850U - 8C/16T)
+  Role    : KVM Hypervisor & Management
+
+  QUICK HEALTH CHECKS:
+  --------------------
+  1. System Load : uptime && free -h
+  2. KVM Status  : virsh list --all
+  3. Storage     : lsblk && df -h /var/lib/libvirt/images
+  4. CPU Temp    : sensors | grep Tctl
+  5. Network     : brctl show && ovs-vsctl show
+  6. Swap        : sudo zramctl && sudo swapon --show
+
+  VM MANAGEMENT:
+  --------------
+  - Console Access : virsh console <vm-name>
+  - Resource Usage : virt-top
+  - Locked Memory  : grep "VmLck" /proc/\$(pgrep -f <vm-name>)/status
+  - Kernel Log     : dmesg -T | grep -iE 'error|warn|iommu|amd'
+
+  OPTIMIZATIONS: IPv6=Disabled, ASPM=Off, Swappiness=10
+================================================================================
+EOF
+
+# -- Host performance tuning ---------------------------------------------------
+echo "--- Tuning host swappiness ---"
+echo "vm.swappiness=10" | sudo tee /etc/sysctl.d/99-swappiness.conf
+sudo sysctl -p /etc/sysctl.d/99-swappiness.conf
 
 # -- Vérifications finales -----------------------------------------------------
 echo ""
