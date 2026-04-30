@@ -80,6 +80,32 @@ chpasswd:
       password: ${LAB_PASSWORD}
       type: text
 
+write_files:
+  - path: /etc/motd
+    content: |
+      ================================================================================
+        DEMO CLIENT - NODE: ${VM_NAME}
+      ================================================================================
+        Network: ${NETWORK} | Portgroup: ${PORTGROUP}
+
+        QUICK CONNECTIVITY TESTS:
+        -------------------------
+        1. Local IP    : ip -4 a show eth0
+        2. Gateway     : ping -c 3 10.x.${LAN_NUMBER}.1 (Local Router)
+        3. Site A <-> B: ping -c 3 REMOTE_DEMO_IP
+        4. Internet    : ping -c 3 google.com
+        5. DNS Lookup  : nslookup m-server00.maison.lab
+
+        SYSTEM:
+        -------
+        - Services     : rc-status -s
+        - Guest Agent  : ps -ef | grep qemu-ga
+        - Routing      : ip route show
+
+        NOTE: Cloud-init is disabled. Use sudo for root tasks.
+      ================================================================================
+
+
 runcmd:
   - apk add --no-cache qemu-guest-agent tcpdump
   - rc-update add qemu-guest-agent default
