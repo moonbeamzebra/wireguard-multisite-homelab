@@ -172,6 +172,46 @@ write_files:
       AllowTcpForwarding no
       MaxAuthTries 3
 
+  - path: /etc/motd
+    content: |
+      ================================================================================
+        BASTION WIREGUARD - SITE: ${SITE_NAME^^}
+      ================================================================================
+        Purpose: VPN Gateway & WAN Protection
+
+        QUICK SANITY CHECKS:
+        --------------------
+        1. Networking  : ip a && ip r
+        2. VPN Status  : sudo wg show
+        3. Tunnel Ping : ping -c 3 ${ROUTE2_GW} (Remote Bastion)
+        4. DMZ Ping    : ping -c 3 ${ROUTE1_GW} (Local Router)
+        5. Internet    : ping -c 3 8.8.8.
+        6. Service     : rc-status or rc-status -s
+
+        ADVANCED DEBUGGING:
+        -------------------
+        - Firewall Logs : sudo iptables -L -n -v --line-numbers
+        - NAT Table     : sudo iptables -t nat -L -n -v
+        - Performance   : grep "VmLck" /proc/self/status (Should be non-zero)
+        - Forwarding    : sysctl net.ipv4.ip_forward (Should be 1)
+
+        STRESS TEST (iPerf3):
+        ---------------------
+        This is the ultimate real-world proof.
+        If you have two machines (one at each site), install iperf3 (add iperf3 apk).
+
+        On c-demo-lan30: iperf3 -s
+        On m-demo-lan30: iperf3 -c 10.1.30.172
+        While the test is running, launch virt-top on your m-server00 host.
+
+        Observation: If your Bastion host manages to saturate your link (e.g., 500 Mbps or 1 Gbps) while
+        only using 20% ​​or 30% of a CPU core, the hardware acceleration is truly impressive.
+        On an older CPU without these instructions, the same throughput would push the CPU to 100% usage.
+
+        SERVICES: rc-service --list | grep -E 'wireguard|iptables'
+      ================================================================================
+
+
 runcmd:
   - rc-update add networking boot
   - rc-service networking restart
@@ -205,6 +245,7 @@ runcmd:
   - rc-update del cloud-init default 2>/dev/null || true
   - rc-update del cloud-config default 2>/dev/null || true
   - rc-update del cloud-final default 2>/dev/null || true
+  - rc-update del cloud-init-hotplugd default 2>/dev/null || true
   - reboot
 EOF
 
