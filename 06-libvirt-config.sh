@@ -60,11 +60,6 @@ cat << EOF | sudo tee ${LIBVIRT_OVERRIDE_DIR}/override.conf
 LimitMEMLOCK=infinity
 EOF
 
-# -- Host performance tuning ---------------------------------------------------
-echo "--- Tuning host swappiness ---"
-echo "vm.swappiness=10" | sudo tee /etc/sysctl.d/99-swappiness.conf
-sudo sysctl -p /etc/sysctl.d/99-swappiness.conf
-
 # Reload libvirtd to apply memlock and service overrides
 echo "--- Restarting libvirtd ---"
 sudo systemctl daemon-reload
