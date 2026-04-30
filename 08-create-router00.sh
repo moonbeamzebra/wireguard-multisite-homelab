@@ -231,6 +231,33 @@ ${DNS_STATIC}
 
       COMMIT
 
+  - path: /etc/motd
+    content: |
+      ================================================================================
+        CORE ROUTER - SITE: ${SITE_NAME^^}
+      ================================================================================
+        Purpose: DHCP, DNS, & Inter-VLAN Routing
+
+        QUICK SANITY CHECKS:
+        --------------------
+        1. Interfaces  : ip -4 a (Verify eth1, eth2.20, eth2.30, eth3)
+        2. Gateway     : ping -c 3 ${ROUTER00_GW_eth0} (Local Bastion)
+        3. DNS Test    : sudo dnsmasq --test && nslookup google.com 127.0.0.1
+        4. DHCP Leases : cat /var/lib/misc/dnsmasq.leases
+        5. Internet    : ping -c 3 1.1.1.1
+        6. Service     : rc-status
+
+        ADVANCED DEBUGGING:
+        -------------------
+        - Routing Table : ip route show
+        - Firewall Rules: sudo iptables -L -n -v
+        - VLAN Traffic  : tcpdump -n -i eth2 (Watch tagged traffic)
+        - Performance   : ethtool -l eth0 (Verify Combined: 2)
+
+        SERVICES: rc-service --list | grep -E 'dnsmasq|iptables|networking'
+      ================================================================================
+
+
 runcmd:
   - rc-update add networking boot
   - rc-service networking restart
@@ -244,7 +271,8 @@ runcmd:
   - rc-update add acpid default
   - sysctl -p /etc/sysctl.d/router.conf
 
-  - echo "nameserver 127.0.0.1" > /etc/resolv.conf
+  - echo "nameserver 127.0.0.1" > /etc/resolv.conf.head
+  - echo "search ${PRIMARY_DOMAIN} ${SECONDARY_DOMAIN}" > /etc/resolv.conf.tail
 
   # IPv6 Hardening
   - echo "noipv6" >> /etc/dhcpcd.conf
@@ -260,6 +288,7 @@ runcmd:
   - rc-update del cloud-init default 2>/dev/null || true
   - rc-update del cloud-config default 2>/dev/null || true
   - rc-update del cloud-final default 2>/dev/null || true
+  - rc-update del cloud-init-hotplugd default 2>/dev/null || true
   - reboot
 EOF
 
@@ -294,6 +323,26 @@ virt-install \
     --autostart
 
 rm -rf ${CIDATA}
+
+# Since router00 will soon works
+# set 1st nameserver to lan10 interface of router00 that manage the dns of the site
+#
+# Remove the symbolic link if it exists
+sudo chattr -i /etc/resolv.conf || true
+sudo rm -f /etc/resolv.conf
+# Create desired one
+cat << EOF | sudo tee /etc/resolv.conf
+# /etc/resolv.conf is immutable - to edit : sudo chattr -i /etc/resolv.conf
+nameserver ${ROUTER00_IP_eth1}
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+search ${PRIMARY_DOMAIN} ${SECONDARY_DOMAIN}
+EOF
+# Disable the services that try to write to it
+sudo systemctl disable --now resolvconf 2>/dev/null || true
+# The "coup de grace": makes the file immutable (Immutable Attribute)
+# To revert : sudo chattr -i /etc/resolv.conf
+sudo chattr +i /etc/resolv.conf
 
 echo ""
 echo "==> VM ${ROUTER00_VM_NAME} created"
