@@ -148,7 +148,11 @@ sudo -E bash 03-packages.sh
 ## you will not be able to access Internet until 'router00' is installed (that require Alpine Image)
 ## chicken and egg problem 
 echo "nameserver 8.8.8.8" | sudo tee "/etc/resolv.conf"
-bash 03b-download-update-alpine-image.sh
+source site-A-GMKtec.env && bash 03b-download-update-alpine-image.sh
+source site-B-GMKtec.env && bash 03b-download-update-alpine-image.sh
+OU
+source site-A-GMKtec.env && bash 03c-download-update-debian-image.sh
+source site-B-GMKtec.env && bash 03c-download-update-debian-image.sh
 
 sudo -E bash 04-network.sh
 sudo reboot
@@ -162,7 +166,10 @@ source site-A-GMKtec.env && source secrets-A-GMKtec.env
 source site-B-GMKtec.env && source secrets-B-GMKtec.env
 bash 07-create-bastion.sh
 bash 08-create-router00.sh
-bash 09-create-demo-vms.sh
+bash 09-create-demo-vms.sh && virsh console m-demo-lan30
+bash 09-create-demo-vms-debian.sh && virsh console m-demo-d-lan30
+source site-A-GMKtec.env && source secrets-A-GMKtec.env && bash 09-create-demo-vms-debian.sh
+bash 10-host-hardening.sh
 ```
 
 ## Real-CE port forwarding
