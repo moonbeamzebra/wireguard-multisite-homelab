@@ -30,12 +30,20 @@ echo "--- Configuring Host Firewall (UFW) ---"
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 
-# Allow SSH from ALL internal subnets (10.0.x.x and 10.1.x.x)
-# This covers LAN5, LAN10, VLAN20, VLAN30 and WireGuard transits
-sudo ufw allow from 10.0.0.0/15 to any port 22 proto tcp comment 'Internal Management SSH'
+# Allow SSH from ALL local internal subnets
+sudo ufw allow from ${LAN5_SUBNET} to any port 22 proto tcp comment 'local LAN5 Management SSH'
+sudo ufw allow from ${LAN10_SUBNET} to any port 22 proto tcp comment 'local LAN10 Management SSH'
+sudo ufw allow from ${LAN20_SUBNET} to any port 22 proto tcp comment 'local LAN20 Management SSH'
+sudo ufw allow from ${LAN30_SUBNET} to any port 22 proto tcp comment 'local LAN30 Management SSH'
+
+# Allow SSH from ALL remote internal subnets - Via VPN WireGuard
+sudo ufw allow from ${REMOTE_LAN5_SUBNET} to any port 22 proto tcp comment 'remote LAN5 Management SSH'
+sudo ufw allow from ${REMOTE_LAN10_SUBNET} to any port 22 proto tcp comment 'remote LAN10 Management SSH'
+sudo ufw allow from ${REMOTE_LAN20_SUBNET} to any port 22 proto tcp comment 'remote LAN20 Management SSH'
+sudo ufw allow from ${REMOTE_LAN30_SUBNET} to any port 22 proto tcp comment 'remote LAN30 Management SSH'
 
 # Temporary: Allow SSH from WiFi (if you are on a 192.168.x.x subnet during build)
-# Note: On pourra retirer cette règle une fois les machines à leur site final
+# Note: This rule can be removed once the machines are at their final site
 sudo ufw allow from 192.168.0.0/16 to any port 22 proto tcp comment 'Build phase WiFi access'
 
 # ENABLE Firewall
