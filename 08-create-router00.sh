@@ -177,6 +177,7 @@ write_files:
 
       server=/${DNS_REMOTE_REVERSE}/${DNS_REMOTE_REVERSE_SERVER}
       conf-dir=/etc/dnsmasq.d/,*.conf
+      dhcp-host=cc:f4:11:15:1b:7e,google-nest-maison,10.0.10.100
 
   - path: /etc/dnsmasq.d/static-hosts.conf
     content: |
