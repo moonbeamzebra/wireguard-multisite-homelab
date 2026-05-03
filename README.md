@@ -139,6 +139,7 @@ bash 02-create-server00.sh
 
 
 # 3. Host setup (run on h-server00)
+sudo apt update -y && sudo apt install rsync -y
 source site-A-GMKtec.env && source secrets-A-GMKtec.env
 source site-B-GMKtec.env && source secrets-B-GMKtec.env
 sudo -E bash 03-packages.sh
@@ -164,12 +165,11 @@ sudo bash 06-libvirt-config.sh
 # 4. KVM setup (run on h-server00)
 source site-A-GMKtec.env && source secrets-A-GMKtec.env
 source site-B-GMKtec.env && source secrets-B-GMKtec.env
-bash 07-create-bastion.sh
-bash 08-create-router00.sh
-bash 09-create-demo-vms.sh && virsh console m-demo-lan30
+bash 07-create-bastion.sh && virsh console m-bastion
+bash 08-create-router00.sh && virsh console m-router00
+bash 09-create-demo-vms-alpine.sh && virsh console m-demo-a-lan30
 bash 09-create-demo-vms-debian.sh && virsh console m-demo-d-lan30
-source site-A-GMKtec.env && source secrets-A-GMKtec.env && bash 09-create-demo-vms-debian.sh
-bash 10-host-hardening.sh
+sudo -E bash 10-host-hardening.sh [dev|prod] 
 ```
 
 ## Real-CE port forwarding
