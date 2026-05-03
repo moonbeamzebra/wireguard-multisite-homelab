@@ -32,7 +32,7 @@ REQUIRED_VARS="SITE_NAME ROUTER00_VM_NAME ROUTER00_HOSTNAME PRIMARY_DOMAIN
                DHCP_VLAN30_START DHCP_VLAN30_END
                DNS_REMOTE_DOMAIN DNS_REMOTE_SERVER
                DNS_REMOTE_REVERSE DNS_REMOTE_REVERSE_SERVER
-               DNS_STATIC
+               DNS_STATIC DHCP_STATIC_HOSTS
                IPTABLES_ETH0_ACCEPT_1 IPTABLES_ETH0_ACCEPT_2
                NET_eth0 NET_eth1_portgroup NET_eth2_portgroup NET_eth3_portgroup
                LAB_SSH_PUBKEY LAB_PASSWORD ROOT_PASSWORD"
@@ -177,11 +177,14 @@ write_files:
 
       server=/${DNS_REMOTE_REVERSE}/${DNS_REMOTE_REVERSE_SERVER}
       conf-dir=/etc/dnsmasq.d/,*.conf
-      dhcp-host=cc:f4:11:15:1b:7e,google-nest-maison,10.0.10.100
 
   - path: /etc/dnsmasq.d/static-hosts.conf
     content: |
 ${DNS_STATIC}
+
+  - path: /etc/dnsmasq.d/static-dhcp.conf
+    content: |
+${DHCP_STATIC_HOSTS}
 
   - path: /etc/sysctl.d/router.conf
     content: |
