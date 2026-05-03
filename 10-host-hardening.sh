@@ -147,10 +147,13 @@ else
     # dev mode: restore WiFi config from /root/ if it was previously disabled by prod
     if [[ -f /root/01-wifi.conf.disabled && ! -f /etc/network/interfaces.d/01-wifi.conf ]]; then
         cp /root/01-wifi.conf.disabled /etc/network/interfaces.d/01-wifi.conf
-        ifup wlan0 2>/dev/null || true
         echo "==> WiFi config restored from /root/01-wifi.conf.disabled"
     else
         echo "==> WiFi interface: left in place (dev mode)"
+    fi
+    # Bring WiFi up regardless -- covers both restore and manual file placement
+    if [[ -f /etc/network/interfaces.d/01-wifi.conf ]]; then
+        ifup "${PRESEED_IF_LAN}" 2>/dev/null || true
     fi
 fi
 
