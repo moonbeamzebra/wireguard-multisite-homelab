@@ -156,7 +156,8 @@ write_files:
       -A INPUT -i eth0 -p udp --dport 51820 -j ACCEPT
       -A INPUT -i eth1 -p tcp --dport 22 -j ACCEPT
       -A INPUT -i eth1 -p icmp -j ACCEPT
-      -A INPUT -i wg0 -p icmp -j ACCEPT
+      -A INPUT -i wg0  -p tcp --dport 22 -j ACCEPT
+      -A INPUT -i wg0  -p icmp -j ACCEPT
       -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
       -A FORWARD -i wg0 -o eth1 -j ACCEPT
       -A FORWARD -i eth1 -o wg0 -j ACCEPT
