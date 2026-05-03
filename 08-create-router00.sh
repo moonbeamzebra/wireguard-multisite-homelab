@@ -196,39 +196,53 @@ ${DNS_STATIC}
       :OUTPUT ACCEPT [0:0]
       -A INPUT -i lo -j ACCEPT
       -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+      # DMZ (eth0): accept from bastion and inter-site traffic only
       -A INPUT -i eth0 -s ${IPTABLES_ETH0_ACCEPT_1} -j ACCEPT
       -A INPUT -i eth0 -s ${IPTABLES_ETH0_ACCEPT_2} -j ACCEPT
-      -A INPUT -i eth1    -j ACCEPT
-      -A INPUT -i eth2.20 -j ACCEPT
-      -A INPUT -i eth2.30 -j ACCEPT
-      -A INPUT -i eth3    -j ACCEPT
+
+      # LAN10 (eth1): infrastructure subnet -- full access (DHCP, DNS, SSH)
+      -A INPUT -i eth1 -j ACCEPT
+
+      # App subnets (eth2.20, eth2.30, eth3/LAN5): DHCP and DNS only
+      # These are application subnets -- no direct router management access
+      -A INPUT -i eth2.20 -p udp --dport 67:68 -j ACCEPT
+      -A INPUT -i eth2.20 -p udp --dport 53    -j ACCEPT
+      -A INPUT -i eth2.20 -p tcp --dport 53    -j ACCEPT
+      -A INPUT -i eth2.30 -p udp --dport 67:68 -j ACCEPT
+      -A INPUT -i eth2.30 -p udp --dport 53    -j ACCEPT
+      -A INPUT -i eth2.30 -p tcp --dport 53    -j ACCEPT
+      -A INPUT -i eth3    -p udp --dport 67:68 -j ACCEPT
+      -A INPUT -i eth3    -p udp --dport 53    -j ACCEPT
+      -A INPUT -i eth3    -p tcp --dport 53    -j ACCEPT
 
       -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
 
-      -A FORWARD -i eth0 -o eth1 -j ACCEPT
+      # From DMZ (bastion/tunnel): to all local subnets
+      -A FORWARD -i eth0 -o eth1    -j ACCEPT
       -A FORWARD -i eth0 -o eth2.20 -j ACCEPT
       -A FORWARD -i eth0 -o eth2.30 -j ACCEPT
-      -A FORWARD -i eth0 -o eth3 -j ACCEPT
+      -A FORWARD -i eth0 -o eth3    -j ACCEPT
 
-      -A FORWARD -i eth1 -o eth0 -j ACCEPT
+      # From LAN10 (infra): to all subnets and tunnel
+      -A FORWARD -i eth1 -o eth0    -j ACCEPT
       -A FORWARD -i eth1 -o eth2.20 -j ACCEPT
       -A FORWARD -i eth1 -o eth2.30 -j ACCEPT
-      -A FORWARD -i eth1 -o eth3 -j ACCEPT
+      -A FORWARD -i eth1 -o eth3    -j ACCEPT
 
-      -A FORWARD -i eth2.20 -o eth0 -j ACCEPT
-      -A FORWARD -i eth2.20 -o eth1 -j ACCEPT
+      # From app subnets: to tunnel and cross-subnet -- NOT to LAN10 (infra isolation)
+      # A compromised app VM must not reach m-server00 or c-server00 on LAN10
+      -A FORWARD -i eth2.20 -o eth0    -j ACCEPT
       -A FORWARD -i eth2.20 -o eth2.30 -j ACCEPT
-      -A FORWARD -i eth2.20 -o eth3 -j ACCEPT
+      -A FORWARD -i eth2.20 -o eth3    -j ACCEPT
 
-      -A FORWARD -i eth2.30 -o eth0 -j ACCEPT
-      -A FORWARD -i eth2.30 -o eth1 -j ACCEPT
+      -A FORWARD -i eth2.30 -o eth0    -j ACCEPT
       -A FORWARD -i eth2.30 -o eth2.20 -j ACCEPT
-      -A FORWARD -i eth2.30 -o eth3 -j ACCEPT
+      -A FORWARD -i eth2.30 -o eth3    -j ACCEPT
 
-      -A FORWARD -i eth3 -o eth0 -j ACCEPT
-      -A FORWARD -i eth3 -o eth1 -j ACCEPT
+      -A FORWARD -i eth3 -o eth0    -j ACCEPT
       -A FORWARD -i eth3 -o eth2.20 -j ACCEPT
-      -A FORWARD -i eth3 -o eth2.20 -j ACCEPT
+      -A FORWARD -i eth3 -o eth2.30 -j ACCEPT
 
       COMMIT
 
