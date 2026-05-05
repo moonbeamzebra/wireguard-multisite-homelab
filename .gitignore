@@ -9,6 +9,7 @@ secrets-*.conf
 
 # HowTo en construction
 *.ht.txt
+ANALYSIS_REPORT.md
 
 *.tar.gz
 
