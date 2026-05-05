@@ -1,6 +1,8 @@
 # Secrets -- never commit
 secrets-*.env
 secrets-*.conf
+*-secrets.env
+*-secrets.env
 
 # Original kept
 *.orginal.sh
