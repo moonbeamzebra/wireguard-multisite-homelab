@@ -10,6 +10,7 @@ secrets-*.conf
 # HowTo en construction
 *.ht.txt
 ANALYSIS_REPORT.md
+gitignore.txt
 
 *.tar.gz
 
