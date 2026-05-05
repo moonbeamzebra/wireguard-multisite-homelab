@@ -1,12 +1,12 @@
 #!/bin/bash
-# 09-create-demo-vms-debian.sh -- Deploy Debian 13 test VMs on LAN5, LAN10, VLAN20, VLAN30
+# 11-create-demo-vms-debian.sh -- Deploy Debian 13 test VMs on LAN5, LAN10, VLAN20, VLAN30
 #
-# Prerequisite: run 03c-download-update-debian-image.sh first to produce the
+# Prerequisite: run 04-download-update-debian-image.sh first to produce the
 # patched base image (GRUB serial console, apt upgrade, baseline packages).
 #
 # Usage:
-#   source site-A-GMKtec.env && source secrets-A-GMKtec.env && bash 09-create-demo-vms-debian.sh
-#   source site-B-GMKtec.env && source secrets-B-GMKtec.env && bash 09-create-demo-vms-debian.sh
+#   source site-A.env && source site-A-secrets.env && bash 11-create-demo-vms-debian.sh
+#   source site-B.env && source site-B-secrets.env && bash 11-create-demo-vms-debian.sh
 #
 # Required env vars (from site-*.env + secrets-*.env):
 #   SITE_NAME, DEMO_VM_PREFIX, DEMO_IP_PREFIX
@@ -27,7 +27,7 @@ set -euo pipefail
 for VAR in SITE_NAME DEMO_VM_PREFIX DEMO_IP_PREFIX LAB_SSH_PUBKEY LAB_PASSWORD ROOT_PASSWORD DEBIAN_EFFECTIVE_IMAGE_TO_USE; do
     if [[ -z "${!VAR:-}" ]]; then
         echo "ERROR: missing variable: ${VAR}"
-        echo "Usage: source site-A-GMKtec.env && source secrets-A-GMKtec.env && bash 09-create-demo-vms-debian.sh"
+        echo "Usage: source site-A.env && source site-A-secrets.env && bash 11-create-demo-vms-debian.sh"
         exit 1
     fi
 done
@@ -37,7 +37,7 @@ IMAGE_PATH="/var/lib/libvirt/images/iso/${IMAGE_NAME}"
 
 if [[ ! -f "${IMAGE_PATH}" ]]; then
     echo "ERROR: base image not found: ${IMAGE_PATH}"
-    echo "       Run 03c-download-update-debian-image.sh first."
+    echo "       Run 04-download-update-debian-image.sh first."
     exit 1
 fi
 

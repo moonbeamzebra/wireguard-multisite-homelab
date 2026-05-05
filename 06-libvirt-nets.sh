@@ -1,20 +1,19 @@
 #!/bin/bash
-# 05-libvirt-nets.sh -- Define libvirt networks on the host
-# Usage: sudo bash 05-libvirt-nets.sh
+# 06-libvirt-nets.sh -- Define libvirt networks on the host
+# Usage: sudo bash 06-libvirt-nets.sh
 #
 # Creates five libvirt networks, each backed by an existing host bridge:
 #   lan-isp   -> br-isp    (bastion WAN)
 #   lan-dmz   -> br-dmz    (bastion <-> router00 /30)
 #   lan-ext10 -> br-ext10    (LAN10 untagged)
 #   lan-int   -> ovs-lab   (OVS trunk -- VLANs 20, 30)
-#   lan-mgmt-access -> br-mgmt-access (jump VM management)
 
 set -euo pipefail
-echo "=== [05-libvirt-nets] Start ==="
+echo "=== [06-libvirt-nets] Start ==="
 
 virsh list &>/dev/null || { echo "ERROR: libvirt not accessible"; exit 1; }
 for br in br-isp br-dmz br-ext10 ovs-lab; do
-    ip link show "${br}" &>/dev/null || { echo "ERROR: bridge ${br} missing -- run 04-network.sh first"; exit 1; }
+    ip link show "${br}" &>/dev/null || { echo "ERROR: bridge ${br} missing -- run 05-network.sh first"; exit 1; }
 done
 
 define_network() {
@@ -33,7 +32,8 @@ define_network() {
 mkdir -p /tmp/libvirt-nets
 
 # Network XML definitions
-# The 'name' keyword is encoded to avoid being filtered in some contexts.
+# The XML <name> tag is written via a variable to avoid being stripped
+# by some text processing tools that interpret angle brackets. to avoid being filtered in some contexts.
 NN=name
 
 cat > /tmp/libvirt-nets/lan-isp.xml << EOF
@@ -97,4 +97,4 @@ define_network "lan-int"    /tmp/libvirt-nets/lan-int.xml
 echo ""
 echo "=== Active libvirt networks ==="
 virsh net-list --all
-echo "=== [05-libvirt-nets] Done ==="
+echo "=== [06-libvirt-nets] Done ==="

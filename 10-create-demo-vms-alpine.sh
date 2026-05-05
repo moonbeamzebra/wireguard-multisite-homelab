@@ -1,9 +1,9 @@
 #!/bin/bash
-# 09-create-demo-vms-alpine.sh -- Deploy Alpine test VMs on LAN5, LAN10, VLAN20, VLAN30
+# 10-create-demo-vms-alpine.sh -- Deploy Alpine test VMs on LAN5, LAN10, VLAN20, VLAN30
 #
 # Usage:
-#   source site-A-GMKtec.env && source secrets-A-GMKtec.env && bash 09-create-demo-vms-alpine.sh
-#   source site-B-GMKtec.env && source secrets-B-GMKtec.env && bash 09-create-demo-vms-alpine.sh
+#   source site-A.env && source site-A-secrets.env && bash 10-create-demo-vms-alpine.sh
+#   source site-B.env && source site-B-secrets.env && bash 10-create-demo-vms-alpine.sh
 #
 # Required env vars (from site-*.env + secrets-*.env):
 #   SITE_NAME, DEMO_VM_PREFIX, DEMO_IP_PREFIX
@@ -26,7 +26,7 @@ for VAR in SITE_NAME DEMO_VM_PREFIX DEMO_IP_PREFIX \
            ALPINE_EFFECTIVE_IMAGE_TO_USE; do
     if [[ -z "${!VAR:-}" ]]; then
         echo "ERROR: missing variable: ${VAR}"
-        echo "Usage: source site-A-GMKtec.env && source secrets-A-GMKtec.env && bash 09-create-demo-vms-alpine.sh"
+        echo "Usage: source site-A.env && source site-A-secrets.env && bash 10-create-demo-vms-alpine.sh"
         exit 1
     fi
 done
@@ -36,7 +36,7 @@ IMAGE_PATH="/var/lib/libvirt/images/iso/${IMAGE_NAME}"
 
 if [[ ! -f "${IMAGE_PATH}" ]]; then
     echo "ERROR: base image not found: ${IMAGE_PATH}"
-    echo "       Run 03b-download-update-alpine-image.sh first."
+    echo "       Run 03-download-update-alpine-image.sh first."
     exit 1
 fi
 

@@ -1,6 +1,6 @@
 #!/bin/bash
-# 06-libvirt-config.sh -- libvirt post-install configuration
-# Usage: sudo bash 06-libvirt-config.sh
+# 07-libvirt-config.sh -- libvirt post-install configuration
+# Usage: sudo bash 07-libvirt-config.sh
 #
 # What this does:
 #   - ON_SHUTDOWN=shutdown : Gracefully power off KVMs on host shutdown (Clean state)
@@ -11,9 +11,9 @@
 
 set -euo pipefail
 
-echo "=== [06-libvirt-config] Start ==="
+echo "=== [07-libvirt-config] Start ==="
 
-# -- libvirt-guests: Clean shutdown/boot logic --------------------------------
+# -- libvirt-guests: graceful shutdown and autostart on boot --------------------------------
 echo "--- Configuring libvirt-guests (Shutdown mode) ---"
 
 LIBVIRT_GUESTS_CONF=/etc/default/libvirt-guests
@@ -43,7 +43,7 @@ else
     echo "default bridge: not present (OK)"
 fi
 
-# -- Configure system limits (Locked Memory) -----------------------------------
+# -- System limits for locked memory (required for memorybacking locked=yes) -----------------------------------
 echo "--- Configuring system limits (memlock) ---"
 cat << EOF | sudo tee /etc/security/limits.d/libvirt-memlock.conf
 # Allow libvirt-qemu to lock all RAM (Required for locked=yes)
@@ -51,7 +51,7 @@ libvirt-qemu    soft    memlock         unlimited
 libvirt-qemu    hard    memlock         unlimited
 EOF
 
-# Override Systemd Libvirt limits
+# Systemd service override for the same limit
 echo "--- Overriding Systemd Libvirt limits ---"
 LIBVIRT_OVERRIDE_DIR=/etc/systemd/system/libvirtd.service.d
 sudo mkdir -p ${LIBVIRT_OVERRIDE_DIR}
@@ -60,9 +60,9 @@ cat << EOF | sudo tee ${LIBVIRT_OVERRIDE_DIR}/override.conf
 LimitMEMLOCK=infinity
 EOF
 
-# Reload libvirtd to apply memlock and service overrides
+# Reload and restart libvirtd to apply memlock and service overrides
 echo "--- Restarting libvirtd ---"
 sudo systemctl daemon-reload
 sudo systemctl restart libvirtd
 
-echo "=== [06-libvirt-config] Done ==="
+echo "=== [07-libvirt-config] Done ==="

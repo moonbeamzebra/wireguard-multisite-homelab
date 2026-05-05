@@ -1,5 +1,5 @@
 #!/bin/bash
-# 03c-download-update-debian-image.sh
+# 04-download-update-debian-image.sh
 #
 # Downloads the official Debian 13 (trixie) generic cloud image, runs
 # apt upgrade, and applies the minimal patches required to boot headless
@@ -18,10 +18,10 @@
 #   4. systemd-firstboot    -- masked so cloud-init owns first-boot config
 #
 # Usage:
-#   source site-A-GMKtec.env && bash 03c-download-update-debian-image.sh
-#   source site-B-GMKtec.env && bash 03c-download-update-debian-image.sh
+#   source site-A-GMKtec.env && bash 04-download-update-debian-image.sh
+#   source site-B-GMKtec.env && bash 04-download-update-debian-image.sh
 #
-# Prerequisites (installed by 03-packages.sh):
+# Prerequisites (installed by 02-packages.sh):
 #   libguestfs-tools  (virt-customize, virt-resize, virt-cat)
 #   qemu-img, wget
 
@@ -151,5 +151,5 @@ echo ""
 echo "  To sync to the other site:"
 echo "    scp ${IMAGE_UPDATED} lab@<other-site-host>:${IMAGE_DIR}/"
 echo ""
-echo "  Next step: bash 09-create-demo-vms-debian.sh"
+echo "  Next step: bash 11-create-demo-vms-debian.sh"
 echo "================================================================"

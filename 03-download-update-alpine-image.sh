@@ -1,5 +1,5 @@
 #!/bin/bash
-# 03b-download-update-alpine-image.sh -- Update the Alpine cloud-init base image
+# 03-download-update-alpine-image.sh -- Update the Alpine cloud-init base image
 #
 # Takes the original upstream Alpine nocloud image, expands it, runs
 # apk update/upgrade inside a chroot, and produces the "--updated" image
@@ -9,10 +9,10 @@
 # in /var/lib/libvirt/images/iso/.
 #
 # Usage:
-#   bash 03b-download-update-alpine-image.sh
-#   bash 03b-download-update-alpine-image.sh          # then scp to other site (see bottom)
+#   bash 03-download-update-alpine-image.sh
+#   bash 03-download-update-alpine-image.sh          # then scp to other site (see bottom)
 #
-# Prerequisites (installed by 03-packages.sh):
+# Prerequisites (installed by 02-packages.sh):
 #   libguestfs-tools   (guestfish, guestmount, guestunmount)
 #   qemu-img
 
