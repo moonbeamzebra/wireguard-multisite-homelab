@@ -109,6 +109,7 @@ See `GMKtec-M7-Ultra.md` for BIOS settings required before booting from USB.
 ### Step 2 -- Host packages and base config (run on server00)
 
 ```sh
+sudo apt update -y && sudo apt install rsync -y
 source site-A.env && source site-A-secrets.env
 sudo -E bash 02-packages.sh
 ```
