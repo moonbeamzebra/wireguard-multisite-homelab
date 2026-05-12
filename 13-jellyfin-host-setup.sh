@@ -5,7 +5,7 @@
 #   1. Install libvirt-daemon-driver-lxc, exfatprogs, debootstrap
 #   2. Enable the libvirt LXC driver daemon (virtlxcd)
 #   3. Create /mnt/mybook and mount the WD MyBook (exFAT, UUID=56B7-88FB)
-#   4. Add /etc/fstab entry (nofail + automount)
+#   4. Add /etc/fstab entry (nofail -- no automount, required for LXC bind mount)
 #   5. Verify /dev/dri devices exist (VA-API prerequisite)
 #   6. Create the container rootfs directory
 #   7. Print DNS/DHCP lines to add to site-B.env
@@ -125,7 +125,11 @@ echo ""
 echo "==> [4/6] /etc/fstab"
 
 FSTAB_TAG="# jellyfin-mybook"
-FSTAB_LINE="UUID=${MYBOOK_UUID}  ${MYBOOK_MOUNT}  exfat  uid=root,gid=root,umask=022,nofail,x-systemd.automount  0  0  ${FSTAB_TAG}"
+# Note: x-systemd.automount is intentionally NOT used here.
+# automount creates a symlink that causes "too many levels of symbolic links"
+# when libvirt tries to bind-mount /mnt/mybook into the LXC container at boot.
+# Plain nofail mounts the disk normally at boot -- libvirt can then bind-mount it.
+FSTAB_LINE="UUID=${MYBOOK_UUID}  ${MYBOOK_MOUNT}  exfat  uid=root,gid=root,umask=022,nofail  0  0  ${FSTAB_TAG}"
 
 if grep -qF "${FSTAB_TAG}" /etc/fstab; then
     echo "    fstab entry already present -- skipping"
