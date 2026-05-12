@@ -169,9 +169,52 @@ EOF
 # root password
 echo "root:${ROOT_PASSWORD}" | chroot "${ROOTFS}" chpasswd
 
+# Get video and render GIDs from host -- container must use same GIDs
+# so /dev/dri device permissions (set by host kernel) match inside the container.
+HOST_VIDEO_GID=$(getent group video  | cut -d: -f3)
+HOST_RENDER_GID=$(getent group render | cut -d: -f3)
+echo "    Host GIDs: video=${HOST_VIDEO_GID} render=${HOST_RENDER_GID}"
+
+# Recreate groups in container with exact host GIDs.
+# If a different group already owns the target GID, move it out of the way first.
+for GID_VAL in "${HOST_VIDEO_GID}" "${HOST_RENDER_GID}"; do
+    CONFLICT=$(grep ":x:${GID_VAL}:" "${ROOTFS}/etc/group" | cut -d: -f1 || true)
+    if [[ -n "${CONFLICT}" && "${CONFLICT}" != "video" && "${CONFLICT}" != "render" ]]; then
+        FREE_GID=$(awk -F: '{print $3}' "${ROOTFS}/etc/group" | sort -n | tail -1)
+        FREE_GID=$((FREE_GID + 1))
+        chroot "${ROOTFS}" groupmod -g "${FREE_GID}" "${CONFLICT}" 2>/dev/null || true
+        echo "    Moved conflicting group '${CONFLICT}' from GID ${GID_VAL} to ${FREE_GID}"
+    fi
+done
+
+chroot "${ROOTFS}" groupmod -g "${HOST_VIDEO_GID}"  video  2>/dev/null || \
+    chroot "${ROOTFS}" groupadd -g "${HOST_VIDEO_GID}" video
+chroot "${ROOTFS}" groupmod -g "${HOST_RENDER_GID}" render 2>/dev/null || \
+    chroot "${ROOTFS}" groupadd -g "${HOST_RENDER_GID}" render
+
 # lab user
 chroot "${ROOTFS}" useradd -m -s /bin/bash -G sudo,video,render lab 2>/dev/null || true
 echo "lab:${LAB_PASSWORD}" | chroot "${ROOTFS}" chpasswd
+
+# systemd service to fix /dev/dri permissions at every boot.
+# In LXC containers, the host kernel sets device ownership (root:root mode 700)
+# regardless of the host's udev rules. This service corrects it before jellyfin starts.
+cat > "${ROOTFS}/etc/systemd/system/fix-dri-perms.service" << SVCEOF
+[Unit]
+Description=Fix /dev/dri permissions for VA-API (LXC hostdev workaround)
+DefaultDependencies=no
+Before=jellyfin.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'chown root:render /dev/dri/renderD128 && chmod 660 /dev/dri/renderD128 && chown root:video /dev/dri/card0 && chmod 660 /dev/dri/card0'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+chroot "${ROOTFS}" systemctl enable fix-dri-perms.service
+echo "    fix-dri-perms.service: enabled (corrects /dev/dri ownership at boot)"
 
 # NOPASSWD sudo for lab (no password prompt)
 echo "lab ALL=(ALL) NOPASSWD:ALL" > "${ROOTFS}/etc/sudoers.d/lab"
