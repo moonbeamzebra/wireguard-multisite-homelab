@@ -161,11 +161,14 @@ upsc cyberpower@localhost battery.charge.low   # must show 98
 Open two terminals before unplugging:
 
 ```bash
-# Terminal 1 -- watch NUT monitor events
-journalctl -u nut-monitor -f
+# Terminal 1 -- ups client
+watch -n 2 'sudo upsc cyberpower@localhost battery.charge; sudo upsc cyberpower@localhost ups.status; secs=$(sudo upsc cyberpower@localhost battery.runtime); printf "%d min %d sec\n" $((secs / 60)) $((secs % 60))'
 
-# Terminal 2 -- watch shutdown log
-tail -f /var/log/nut-shutdown.log
+# Terminal 2 -- watch NUT monitor events
+sudo journalctl -u nut-monitor -f
+
+# Terminal 3 -- watch shutdown log
+sudo tail -f /var/log/nut-shutdown.log
 ```
 
 Then unplug the UPS from the wall outlet.
